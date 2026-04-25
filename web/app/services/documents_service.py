@@ -51,3 +51,35 @@ def get_document_by_id(document_id):
     conn.close()
 
     return doc
+
+
+def share_document(document_id, shared_with_user_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                INSERT INTO document_shares (document_id, shared_with)
+                VALUES (%s, %s)
+                """, (document_id, shared_with_user_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def get_user_by_id(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                SELECT id, username, is_disabled
+                FROM users
+                WHERE id = %s
+                """, (user_id,))
+
+    user = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return user
