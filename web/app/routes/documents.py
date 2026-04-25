@@ -8,7 +8,7 @@ from ..services.documents_service import (
     get_user_documents,
     create_document,
     get_document_by_id,
-    get_documents_shared_with_user
+    get_documents_shared_with_user,
 )
 
 from ..services.user_service import get_all_users_for_sharing
@@ -24,6 +24,9 @@ def documents_page():
 
     my_docs = get_user_documents(user_id)
     shared_docs = get_documents_shared_with_user(user_id)
+
+    my_docs = [dict(d) if not isinstance(d, dict) else d for d in my_docs]
+    shared_docs = [dict(d) if not isinstance(d, dict) else d for d in shared_docs]
 
     for d in my_docs:
         d["is_owner"] = True
@@ -128,10 +131,7 @@ def shared_documents():
     return flask.jsonify(docs)
 
 
-# DOWNLOAD
-@bp.route("/shared/<int:document_id>/download")
-@login_required
-def download_document(document_id):
+def download_doc(document_id):
     doc = get_document_by_id(document_id)
     user_id = flask.session.get("user_id")
 
@@ -145,3 +145,15 @@ def download_document(document_id):
         f"uploads/{doc['filename']}",
         as_attachment=True
     )
+
+# MY DOCUMENTS DOWNLOAD
+@bp.route("/documents/<int:document_id>/download")
+@login_required
+def download_document(document_id):
+    return download_doc(document_id)
+
+# SHARED DOCUMENTS DOWNLOAD
+@bp.route("/shared/<int:document_id>/download")
+@login_required
+def download_shared_document(document_id):
+    return download_doc(document_id)

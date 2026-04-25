@@ -86,7 +86,7 @@ def get_user_by_id(user_id):
 
 def get_documents_shared_with_user(user_id):
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("""
                 SELECT d.id, d.title, d.filename, d.uploaded_at, d.owner_id
