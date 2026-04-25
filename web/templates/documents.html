@@ -4,7 +4,7 @@
 <section class="grid">
   <div class="card">
     <h2>Upload document</h2>
-    <form method="post" action="{{ url_for('upload_document') }}" enctype="multipart/form-data">
+    <form method="post" action="{{ url_for('documents.upload_document') }}" enctype="multipart/form-data">
       <label>Title</label>
       <input type="text" name="title" required>
 
@@ -41,7 +41,7 @@
             </button>
           </td>
         <td>
-          <a href="{{ url_for('document_details', document_id=doc.id) }}">
+          <a href="{{ url_for('documents.document_details', document_id=doc.id) }}">
             Details
           </a>
         </td>

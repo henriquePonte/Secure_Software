@@ -10,7 +10,7 @@
   <header>
     <h1>Document Management Platform</h1>
     {% if session.get('username') %}
-      <div class="userbox">Logged in as <strong>{{ session.get('username') }}</strong> · <a href="{{ url_for('logout') }}">Logout</a></div>
+      <div class="userbox">Logged in as <strong>{{ session.get('username') }}</strong> · <a href="{{ url_for('auth.logout') }}">Logout</a></div>
     {% endif %}
   </header>
 
