@@ -27,8 +27,8 @@ def get_all_users_for_sharing(current_user_id):
                 SELECT id, username
                 FROM users
                 WHERE is_disabled = FALSE
+                  AND id != %s
                   AND username != 'admin'
-          AND id != %s
                 ORDER BY username
                 """, (current_user_id,))
 
