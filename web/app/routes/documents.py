@@ -129,7 +129,7 @@ def shared_documents():
 
 
 # DOWNLOAD
-@bp.route("/documents/<int:document_id>/download")
+@bp.route("/shared/<int:document_id>/download")
 @login_required
 def download_document(document_id):
     doc = get_document_by_id(document_id)

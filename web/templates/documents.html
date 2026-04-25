@@ -71,14 +71,14 @@
           </a>
         </td>
 
-        <!-- DOWNLOAD (NOVO) -->
+        <!-- DOWNLOAD  -->
         <td>
           <a href="{{ url_for('documents.download_document', document_id=doc.id) }}">
             Download
           </a>
         </td>
 
-        <!-- SHARE (só se for dono) -->
+        <!-- SHARE -->
         <td>
           {% if doc.is_owner %}
 
