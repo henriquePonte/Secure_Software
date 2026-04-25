@@ -1,5 +1,6 @@
 import flask
-from ..security import login_required
+from ..auth.security import login_required
+
 from ..services.documents_service import (
     get_user_documents,
     create_document,

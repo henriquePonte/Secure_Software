@@ -4,11 +4,13 @@ from .. import db
 
 bp = flask.Blueprint("auth", __name__)
 
+
 @bp.route("/")
 def index():
     if flask.session.get("user_id"):
         return flask.redirect(flask.url_for("documents.documents_page"))
     return flask.redirect(flask.url_for("auth.login"))
+
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
@@ -26,10 +28,11 @@ def login():
 
         is_admin = username == "admin"
 
-        if user and (user[2] == password and not user[3]) or is_admin:
+        if user and ((user[2] == password and not user[3]) or is_admin):
             flask.session.clear()
             flask.session["user_id"] = user[0] if username != "admin" else 1
             flask.session["username"] = username
+
             return flask.redirect(flask.url_for("documents.documents_page"))
 
         flask.flash("Invalid credentials.", "error")
