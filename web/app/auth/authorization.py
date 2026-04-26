@@ -20,3 +20,4 @@ def user_can_access_document(user_id, document_id):
     conn.close()
 
     return result is not None
+
