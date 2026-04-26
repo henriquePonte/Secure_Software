@@ -1,5 +1,6 @@
 from ..extensions import get_db
 import psycopg2.extras
+from .. import utils
 
 def get_all_users():
     conn = get_db()
@@ -38,3 +39,8 @@ def get_all_users_for_sharing(current_user_id):
     conn.close()
 
     return users
+
+def get_user_by_username(cur, username):
+    query = utils.prepare_query("SELECT id, username, password, is_disabled FROM users WHERE username='%s'", username)
+    cur.execute(query)
+    return cur.fetchone()
