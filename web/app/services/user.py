@@ -7,9 +7,8 @@ def get_all_users():
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("""
-                SELECT id, username
+                SELECT id, username, is_disabled
                 FROM users
-                WHERE is_disabled = FALSE
                 ORDER BY username
                 """)
 
@@ -44,3 +43,17 @@ def get_user_by_username(cur, username):
     query = utils.prepare_query("SELECT id, username, password, is_disabled FROM users WHERE username='%s'", username)
     cur.execute(query)
     return cur.fetchone()
+
+def set_user_disabled(user_id, disabled: bool):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                UPDATE users
+                SET is_disabled = %s
+                WHERE id = %s
+                """, (disabled, user_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
