@@ -2,7 +2,7 @@ import flask
 from ..auth.security import login_required
 from ..auth.authorization import user_can_access_document
 
-from ..services.documents_service import (
+from ..services.document import (
     get_user_by_id,
     share_document,
     get_user_documents,
@@ -11,7 +11,7 @@ from ..services.documents_service import (
     get_documents_shared_with_user,
 )
 
-from ..services.user_service import get_all_users_for_sharing
+from ..services.user import get_all_users_for_sharing
 
 bp = flask.Blueprint("documents", __name__)
 

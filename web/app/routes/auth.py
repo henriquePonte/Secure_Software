@@ -1,6 +1,6 @@
 import flask
 from ..extensions import get_db
-from ..services.user_service import get_user_by_username
+from ..services.user import get_user_by_username
 
 bp = flask.Blueprint("auth", __name__)
 
