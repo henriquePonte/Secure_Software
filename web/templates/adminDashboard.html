@@ -16,21 +16,48 @@
                 <th>ID</th>
                 <th>Username</th>
                 <th>Disabled</th>
+                <th>Action</th>
             </tr>
             </thead>
 
             <tbody>
             {% for user in users %}
-            <tr>
+            <tr id="row-{{ user.id }}">
+
+                <!-- ID -->
                 <td>{{ user.id }}</td>
+
+                <!-- Username -->
                 <td>{{ user.username }}</td>
-                <td>
+
+                <!-- Disabled status -->
+                <td id="status-{{ user.id }}">
                     {% if user.is_disabled %}
                     <span style="color:red;">Yes</span>
                     {% else %}
                     <span style="color:green;">No</span>
                     {% endif %}
                 </td>
+
+                <!-- Action button -->
+                <td>
+                    {% if user.username == "admin" %}
+                    <span style="color:gray;">Protected</span>
+                    {% else %}
+                    <button
+                            id="btn-{{ user.id }}"
+                            onclick="toggleUser({{ user.id }}, {{ user.is_disabled|tojson }})"
+                            style="background: {% if user.is_disabled %}green{% else %}red{% endif %}; color:white;"
+                    >
+                        {% if user.is_disabled %}
+                        Enable
+                        {% else %}
+                        Disable
+                        {% endif %}
+                    </button>
+                    {% endif %}
+                </td>
+
             </tr>
             {% endfor %}
             </tbody>
@@ -43,5 +70,55 @@
     </div>
 
 </section>
+
+<script>
+    function toggleUser(userId, isDisabled) {
+
+        const url = isDisabled
+            ? "/admin/users/enable"
+            : "/admin/users/disable";
+
+        fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "user_id=" + userId
+        })
+            .then(res => res.json())
+            .then(data => {
+
+                console.log(data);
+
+                if (data.error) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+
+                alert("Success: " + data.status);
+
+                const btn = document.getElementById("btn-" + userId);
+                const status = document.getElementById("status-" + userId);
+
+                if (data.status === "enabled") {
+
+                    btn.innerText = "Disable";
+                    btn.style.background = "red";
+                    btn.setAttribute("onclick", `toggleUser(${userId}, false)`);
+
+                    status.innerHTML = '<span style="color:green;">No</span>';
+
+                } else {
+
+                    btn.innerText = "Enable";
+                    btn.style.background = "green";
+                    btn.setAttribute("onclick", `toggleUser(${userId}, true)`);
+
+                    status.innerHTML = '<span style="color:red;">Yes</span>';
+                }
+            })
+            .catch(err => console.error(err));
+    }
+</script>
 
 {% endblock %}
