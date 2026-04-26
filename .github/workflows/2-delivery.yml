@@ -43,7 +43,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> "$GITHUB_ENV"
           else
-            echo "IMAGE_TAG=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+            echo "IMAGE_TAG=${{ github.event.workflow_run.head_commit.id }}" >> "$GITHUB_ENV"
           fi
 
       - name: Log in to GHCR
