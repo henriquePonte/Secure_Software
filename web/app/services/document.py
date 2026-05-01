@@ -107,6 +107,13 @@ def delete_document_by_id(document_id):
     conn = get_db()
     cur = conn.cursor()
 
+    # delete shares first
+    cur.execute("""
+                DELETE FROM document_shares
+                WHERE document_id = %s
+                """, (document_id,))
+
+    # delete document
     cur.execute("""
                 DELETE FROM documents
                 WHERE id = %s
