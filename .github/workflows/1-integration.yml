@@ -3,7 +3,7 @@ run-name: "${{ github.workflow }}"
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop, pipeline]
   pull_request:
 
 permissions:
@@ -59,6 +59,14 @@ jobs:
       - name: Run smoke tests
         run: |
           pytest -q tests/test_smoke.py
+
+      - name: Install SAST tools
+        run: |
+          pip install bandit
+
+      - name: Run Bandit (fail on high)
+        run: |
+          bandit -r . -lll -f txt
 
       - name: Stop stack
         if: always()

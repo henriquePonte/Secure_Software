@@ -1,26 +1,35 @@
 import flask
 from ..auth.security import login_required
-from ..auth.authorization import user_can_access_document
+from ..auth.rbac import can_access_document, get_owned_document_or_abort
+from ..services.user import get_all_users_for_sharing
+from app.logger.logger import get_logger
+from app.document.upload import is_allowed_file
+import os
+import uuid
+from werkzeug.utils import secure_filename
 
-from ..services.documents_service import (
+from ..services.document import (
     get_user_by_id,
     share_document,
     get_user_documents,
     create_document,
     get_document_by_id,
     get_documents_shared_with_user,
+    delete_document_by_id,
+    update_document_file,
+    update_document_title,
 )
 
-from ..services.user_service import get_all_users_for_sharing
-
+logger = get_logger(__name__)
 bp = flask.Blueprint("documents", __name__)
-
 
 # LIST USER DOCUMENTS
 @bp.route("/documents")
 @login_required
 def documents_page():
     user_id = flask.session.get("user_id")
+
+    logger.info(f"documents.list accessed user_id={user_id}")
 
     my_docs = get_user_documents(user_id)
     shared_docs = get_documents_shared_with_user(user_id)
@@ -49,17 +58,41 @@ def documents_page():
 @bp.route("/documents/upload", methods=["POST"])
 @login_required
 def upload_document():
+
     user_id = flask.session.get("user_id")
     title = flask.request.form.get("title", "Untitled")
     uploaded_file = flask.request.files.get("document")
 
     if not uploaded_file or uploaded_file.filename == "":
+        logger.warning(f"upload.failed empty_file user_id={user_id}")
         return flask.redirect(flask.url_for("documents.documents_page"))
 
-    create_document(user_id, title, uploaded_file.filename)
+    # SECURITY CHECK
+    ok, reason = is_allowed_file(uploaded_file.filename, uploaded_file)
+
+    if not ok:
+        logger.warning(
+            f"upload.blocked user_id={user_id} file={uploaded_file.filename} reason={reason}"
+        )
+        flask.abort(400)
+
+    # SAFE FILENAME
+    original_name = secure_filename(uploaded_file.filename)
+    ext = os.path.splitext(original_name)[1]
+
+    new_filename = f"{uuid.uuid4()}{ext}"
+
+    save_path = os.path.join("uploads", new_filename)
+    uploaded_file.save(save_path)
+
+    # DB INSERT
+    create_document(user_id, title, new_filename)
+
+    logger.info(
+        f"document.uploaded user_id={user_id} title={title} file={new_filename}"
+    )
 
     return flask.redirect(flask.url_for("documents.documents_page"))
-
 
 # DETAILS
 @bp.route("/documents/<int:document_id>")
@@ -67,13 +100,17 @@ def upload_document():
 def document_details(document_id):
     user_id = flask.session.get("user_id")
 
-    if not user_can_access_document(user_id, document_id):
+    if not can_access_document(user_id, document_id):
+        logger.warning(f"document.access_denied user_id={user_id} doc_id={document_id}")
         flask.abort(403)
 
     doc = get_document_by_id(document_id)
 
     if not doc:
+        logger.warning(f"document.not_found doc_id={document_id}")
         flask.abort(404)
+
+    logger.info(f"document.viewed user_id={user_id} doc_id={document_id}")
 
     return flask.render_template(
         "document_details.html",
@@ -87,33 +124,32 @@ def document_details(document_id):
 def share_document_route(document_id):
     user_id = flask.session.get("user_id")
 
-    doc = get_document_by_id(document_id)
-
-    if not doc:
-        flask.abort(404)
-
-    if doc["owner_id"] != user_id:
-        flask.abort(403)
+    doc = get_owned_document_or_abort(user_id, document_id)
 
     shared_with_id = flask.request.form.get("shared_with")
 
     if not shared_with_id:
+        logger.warning(f"share.invalid_missing_target user_id={user_id} doc_id={document_id}")
         flask.abort(400)
 
     try:
         shared_with_id = int(shared_with_id)
     except ValueError:
+        logger.warning(f"share.invalid_target_format user_id={user_id}")
         flask.abort(400)
 
     user = get_user_by_id(shared_with_id)
 
     if not user:
+        logger.warning(f"share.target_not_found target_id={shared_with_id}")
         flask.abort(404)
 
     if user[2]:  # is_disabled
+        logger.warning(f"share.target_disabled target_id={shared_with_id}")
         flask.abort(403)
 
     share_document(document_id, shared_with_id)
+    logger.info(f"document.shared doc_id={document_id} from={user_id} to={shared_with_id}")
 
     return flask.redirect(
         flask.url_for("documents.document_details", document_id=document_id)
@@ -126,34 +162,134 @@ def share_document_route(document_id):
 def shared_documents():
     user_id = flask.session.get("user_id")
 
+    logger.info(f"shared.documents.access user_id={user_id}")
+
     docs = get_documents_shared_with_user(user_id)
+
+    logger.info(f"shared.documents.returned user_id={user_id} count={len(docs)}")
 
     return flask.jsonify(docs)
 
 
+def get_upload_folder():
+    return os.path.abspath(os.path.join("uploads"))
+
 def download_doc(document_id):
-    doc = get_document_by_id(document_id)
     user_id = flask.session.get("user_id")
 
+    doc = get_document_by_id(document_id)
+
     if not doc:
+        logger.warning(f"download.not_found user_id={user_id} doc_id={document_id}")
         flask.abort(404)
 
-    if not user_can_access_document(user_id, document_id):
+    if not can_access_document(user_id, document_id):
+        logger.warning(f"download.denied user_id={user_id} doc_id={document_id}")
         flask.abort(403)
 
-    return flask.send_file(
-        f"uploads/{doc['filename']}",
-        as_attachment=True
-    )
+    logger.info(f"document.downloaded user_id={user_id} doc_id={document_id}")
+
+    upload_dir = get_upload_folder()
+    file_path = os.path.join(upload_dir, doc["filename"])
+
+    if not os.path.exists(file_path):
+        logger.error(f"download.missing_file path={file_path}")
+        flask.abort(404)
+
+    return flask.send_file(file_path, as_attachment=True)
+
 
 # MY DOCUMENTS DOWNLOAD
 @bp.route("/documents/<int:document_id>/download")
 @login_required
 def download_document(document_id):
+    user_id = flask.session.get("user_id")
+    logger.info(f"document.download.request user_id={user_id} doc_id={document_id}")
+
     return download_doc(document_id)
 
 # SHARED DOCUMENTS DOWNLOAD
 @bp.route("/shared/<int:document_id>/download")
 @login_required
 def download_shared_document(document_id):
+    user_id = flask.session.get("user_id")
+    logger.info(f"document.download.request user_id={user_id} doc_id={document_id}")
     return download_doc(document_id)
+
+@bp.route("/documents/<int:document_id>/delete", methods=["POST"])
+@login_required
+def delete_document(document_id):
+
+    user_id = flask.session.get("user_id")
+
+    doc = get_owned_document_or_abort(user_id, document_id)
+
+    delete_document_by_id(document_id)
+
+    logger.info(f"document.deleted user_id={user_id} doc_id={document_id}")
+
+    return flask.redirect(flask.url_for("documents.documents_page"))
+
+@bp.route("/documents/<int:document_id>/edit", methods=["GET"])
+@login_required
+def edit_document_page(document_id):
+
+    user_id = flask.session.get("user_id")
+
+    doc = get_owned_document_or_abort(user_id, document_id)
+
+    return flask.render_template("edit_document.html", document=doc)
+
+@bp.route("/documents/<int:document_id>/edit", methods=["POST"])
+@login_required
+def edit_document(document_id):
+
+    user_id = flask.session.get("user_id")
+
+    doc = get_owned_document_or_abort(user_id, document_id)
+
+    # UPDATE TITLE
+    new_title = flask.request.form.get("title", "").strip()
+
+    if new_title and new_title != doc["title"]:
+        update_document_title(document_id, new_title)
+
+    # UPDATE FILE
+    uploaded_file = flask.request.files.get("document")
+
+    if uploaded_file and uploaded_file.filename:
+
+        ok, reason = is_allowed_file(uploaded_file.filename, uploaded_file)
+
+        if not ok:
+            logger.warning(
+                f"edit.upload_blocked user_id={user_id} doc_id={document_id} reason={reason}"
+            )
+            flask.abort(400)
+
+        # remove old file
+        old_path = os.path.join("uploads", doc["filename"])
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+        # unique filename
+        original_name = secure_filename(uploaded_file.filename)
+        ext = os.path.splitext(original_name)[1]
+
+        new_filename = f"{uuid.uuid4()}{ext}"
+
+        save_path = os.path.join("uploads", new_filename)
+        uploaded_file.save(save_path)
+
+        # update DB
+        update_document_file(document_id, new_filename)
+
+        logger.info(
+            f"document.file_replaced user_id={user_id} doc_id={document_id} file={new_filename}"
+        )
+
+    logger.info(f"document.edited user_id={user_id} doc_id={document_id}")
+
+    return flask.redirect(
+        flask.url_for("documents.document_details", document_id=document_id)
+    )

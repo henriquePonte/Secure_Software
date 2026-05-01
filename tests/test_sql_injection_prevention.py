@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "web"))
 
-from app import db
+from app.services.user import get_user_by_username
 from app.auth.security import (
     find_sql_injection_indicators,
     validate_login_input,
@@ -27,7 +27,7 @@ def test_get_user_by_username_uses_parameterized_query():
     cur = FakeCursor()
     payload = "admin' OR '1'='1' --"
 
-    db.get_user_by_username(cur, payload)
+    get_user_by_username(cur, payload)
 
     assert payload not in cur.executed_query
     assert cur.executed_query.endswith("WHERE username = %s")

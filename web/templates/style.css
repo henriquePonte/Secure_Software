@@ -1,0 +1,52 @@
+.action-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* todos os botões iguais */
+.btn {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 70px;
+}
+
+/* cores */
+.btn-blue {
+    background: #2563eb;
+    color: white;
+}
+
+.btn-gray {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-red {
+    background: #dc2626;
+    color: white;
+}
+
+/* select alinhado com botões */
+.action-select {
+    padding: 6px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    min-width: 110px;
+}
+
+/* forms sem estragar layout */
+.action-item {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 0;
+}
