@@ -57,7 +57,9 @@ def login():
                 return flask.redirect(flask.url_for("documents.documents_page"))
 
         logger.warning(f"Login failed - invalid password or disabled user: {username}")
+
         flask.flash("Invalid credentials.", "error")
+        return flask.redirect(flask.url_for("auth.login"))
 
     return flask.render_template("login.html")
 
