@@ -40,20 +40,29 @@ def hash_password(password):
     return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 
+
 def verify_password(password, hashed_password):
     """
     Verify a plaintext password against its bcrypt hash.
-    
+
     Args:
         password: plaintext password to verify
         hashed_password: bcrypt hash from database
-    
+
     Returns:
         True if password matches, False otherwise
     """
-    if isinstance(hashed_password, str):
-        hashed_password = hashed_password.encode('utf-8')
+    if not password or not hashed_password:
+        return False
+
     if isinstance(password, str):
-        password = password.encode('utf-8')
-    
-    return bcrypt.checkpw(password, hashed_password)
+        password = password.encode("utf-8")
+
+    if isinstance(hashed_password, str):
+        hashed_password = hashed_password.encode("utf-8")
+
+    try:
+        return bcrypt.checkpw(password, hashed_password)
+    except (ValueError, TypeError):
+        # Invalid bcrypt format (bad DB data)
+        return False
