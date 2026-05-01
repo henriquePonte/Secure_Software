@@ -4,7 +4,7 @@ from ..extensions import get_db
 from ..services.user import get_user_by_username
 from app.logger.logger import get_logger
 from ..auth.rbac import is_admin_user
-from ..auth.security import login_required, validate_login_input, log_rejected_login_input
+from ..auth.security import login_required, verify_password, validate_login_input
 
 bp = flask.Blueprint("auth", __name__)
 
@@ -49,7 +49,7 @@ def login():
         cur.close()
         conn.close()
 
-        if user and user[2] == password and not user[3]:
+        if user and verify_password(password, user[2]) and not user[3]:
             flask.session.clear()
             flask.session["user_id"] = user[0]
             flask.session["username"] = username
@@ -69,7 +69,9 @@ def login():
                 return flask.redirect(flask.url_for("documents.documents_page"))
 
         logger.warning(f"Login failed - invalid password or disabled user: {username}")
+
         flask.flash("Invalid credentials.", "error")
+        return flask.redirect(flask.url_for("auth.login"))
 
     return flask.render_template("login.html")
 
