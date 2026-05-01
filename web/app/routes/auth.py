@@ -3,6 +3,7 @@ from datetime import datetime
 from ..extensions import get_db
 from ..services.user import get_user_by_username
 from app.logger.logger import get_logger
+from ..auth.rbac import is_admin_user
 from ..auth.security import login_required
 
 bp = flask.Blueprint("auth", __name__)
@@ -48,7 +49,7 @@ def login():
 
             logger.info(f"Login successful for user_id={user[0]}, username={username}")
 
-            if username == "admin":
+            if is_admin_user():
                 logger.info("Admin redirected to dashboard")
                 return flask.redirect(flask.url_for("admin.dashboard"))
             else:

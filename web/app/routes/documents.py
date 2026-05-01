@@ -1,6 +1,6 @@
 import flask
 from ..auth.security import login_required
-from ..auth.authorization import user_can_access_document
+from ..auth.rbac import can_access_document, get_owned_document_or_abort
 from ..services.user import get_all_users_for_sharing
 from app.logger.logger import get_logger
 from app.document.upload import is_allowed_file
@@ -100,7 +100,7 @@ def upload_document():
 def document_details(document_id):
     user_id = flask.session.get("user_id")
 
-    if not user_can_access_document(user_id, document_id):
+    if not can_access_document(user_id, document_id):
         logger.warning(f"document.access_denied user_id={user_id} doc_id={document_id}")
         flask.abort(403)
 
@@ -124,15 +124,7 @@ def document_details(document_id):
 def share_document_route(document_id):
     user_id = flask.session.get("user_id")
 
-    doc = get_document_by_id(document_id)
-
-    if not doc:
-        logger.warning(f"share.failed doc_not_found doc_id={document_id}")
-        flask.abort(404)
-
-    if doc["owner_id"] != user_id:
-        logger.warning(f"share.forbidden user_id={user_id} doc_id={document_id}")
-        flask.abort(403)
+    doc = get_owned_document_or_abort(user_id, document_id)
 
     shared_with_id = flask.request.form.get("shared_with")
 
@@ -183,14 +175,15 @@ def get_upload_folder():
     return os.path.abspath(os.path.join("uploads"))
 
 def download_doc(document_id):
-    doc = get_document_by_id(document_id)
     user_id = flask.session.get("user_id")
+
+    doc = get_document_by_id(document_id)
 
     if not doc:
         logger.warning(f"download.not_found user_id={user_id} doc_id={document_id}")
         flask.abort(404)
 
-    if not user_can_access_document(user_id, document_id):
+    if not can_access_document(user_id, document_id):
         logger.warning(f"download.denied user_id={user_id} doc_id={document_id}")
         flask.abort(403)
 
@@ -229,16 +222,7 @@ def delete_document(document_id):
 
     user_id = flask.session.get("user_id")
 
-    doc = get_document_by_id(document_id)
-
-    if not doc:
-        logger.warning(f"delete.not_found user_id={user_id} doc_id={document_id}")
-        flask.abort(404)
-
-    # ONLY OWNER
-    if doc["owner_id"] != user_id:
-        logger.warning(f"delete.forbidden user_id={user_id} doc_id={document_id}")
-        flask.abort(403)
+    doc = get_owned_document_or_abort(user_id, document_id)
 
     delete_document_by_id(document_id)
 
@@ -252,15 +236,7 @@ def edit_document_page(document_id):
 
     user_id = flask.session.get("user_id")
 
-    doc = get_document_by_id(document_id)
-
-    if not doc:
-        logger.warning(f"edit.not_found user_id={user_id} doc_id={document_id}")
-        flask.abort(404)
-
-    if doc["owner_id"] != user_id:
-        logger.warning(f"edit.forbidden user_id={user_id} doc_id={document_id}")
-        flask.abort(403)
+    doc = get_owned_document_or_abort(user_id, document_id)
 
     return flask.render_template("edit_document.html", document=doc)
 
@@ -270,15 +246,7 @@ def edit_document(document_id):
 
     user_id = flask.session.get("user_id")
 
-    doc = get_document_by_id(document_id)
-
-    if not doc:
-        logger.warning(f"edit.not_found user_id={user_id} doc_id={document_id}")
-        flask.abort(404)
-
-    if doc["owner_id"] != user_id:
-        logger.warning(f"edit.forbidden user_id={user_id} doc_id={document_id}")
-        flask.abort(403)
+    doc = get_owned_document_or_abort(user_id, document_id)
 
     # UPDATE TITLE
     new_title = flask.request.form.get("title", "").strip()
