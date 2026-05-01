@@ -28,6 +28,10 @@ def create_app():
             "SESSION_COOKIE_SAMESITE": "Lax",
             # We'll manage refresh of last_active ourselves
             "SESSION_REFRESH_EACH_REQUEST": False,
+            # Rate limiting / throttling for repeated failed login attempts
+            "LOGIN_MAX_FAILED_ATTEMPTS": 3,
+            "LOGIN_LOCKOUT_SECONDS": 300,
+            "TRUST_PROXY_HEADERS": False,
         }
     )
 

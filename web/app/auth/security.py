@@ -2,9 +2,15 @@ import flask
 from functools import wraps
 import bcrypt
 import re
+from datetime import datetime, timedelta
+from threading import Lock
 
 _MAX_USERNAME_LENGTH = 150
 _MAX_PASSWORD_LENGTH = 150
+_MAX_FAILED_LOGIN_ATTEMPTS = 3
+_LOGIN_LOCKOUT_SECONDS = 300
+_FAILED_LOGIN_ATTEMPTS = {}
+_FAILED_LOGIN_ATTEMPTS_LOCK = Lock()
 
 _SQL_INJECTION_SIGNATURES = {
     "sql_comment": re.compile(r"(--|#|/\*|\*/)", re.IGNORECASE),
@@ -69,6 +75,90 @@ def log_rejected_login_input(reasons):
         flask.request.path,
         user_agent,
     )
+
+
+def get_login_client_id():
+    trust_proxy_headers = flask.current_app.config.get("TRUST_PROXY_HEADERS", False)
+    forwarded_for = flask.request.headers.get("X-Forwarded-For", "")
+    if trust_proxy_headers and forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    return flask.request.remote_addr or "unknown"
+
+
+def _login_attempt_key(username, client_id):
+    normalized_username = username.strip().lower() if isinstance(username, str) else ""
+    return f"{client_id}:{normalized_username}"
+
+
+def _login_limit_config():
+    if not flask.has_app_context():
+        return _MAX_FAILED_LOGIN_ATTEMPTS, _LOGIN_LOCKOUT_SECONDS
+
+    max_attempts = flask.current_app.config.get(
+        "LOGIN_MAX_FAILED_ATTEMPTS", _MAX_FAILED_LOGIN_ATTEMPTS
+    )
+    lockout_seconds = flask.current_app.config.get(
+        "LOGIN_LOCKOUT_SECONDS", _LOGIN_LOCKOUT_SECONDS
+    )
+    return max_attempts, lockout_seconds
+
+
+def is_login_temporarily_blocked(username, client_id, now=None):
+    now = now or datetime.utcnow()
+    key = _login_attempt_key(username, client_id)
+
+    with _FAILED_LOGIN_ATTEMPTS_LOCK:
+        attempt = _FAILED_LOGIN_ATTEMPTS.get(key)
+        if not attempt:
+            return False, 0
+
+        locked_until = attempt.get("locked_until")
+        if not locked_until:
+            return False, 0
+
+        if locked_until <= now:
+            _FAILED_LOGIN_ATTEMPTS.pop(key, None)
+            return False, 0
+
+        return True, int((locked_until - now).total_seconds())
+
+
+def record_failed_login_attempt(username, client_id, now=None):
+    now = now or datetime.utcnow()
+    max_attempts, lockout_seconds = _login_limit_config()
+    key = _login_attempt_key(username, client_id)
+
+    with _FAILED_LOGIN_ATTEMPTS_LOCK:
+        attempt = _FAILED_LOGIN_ATTEMPTS.get(key, {"count": 0, "locked_until": None})
+
+        locked_until = attempt.get("locked_until")
+        if locked_until and locked_until <= now:
+            attempt = {"count": 0, "locked_until": None}
+
+        attempt["count"] += 1
+
+        if attempt["count"] >= max_attempts:
+            attempt["locked_until"] = now + timedelta(seconds=lockout_seconds)
+
+        _FAILED_LOGIN_ATTEMPTS[key] = attempt
+
+        remaining = 0
+        if attempt.get("locked_until"):
+            remaining = max(0, int((attempt["locked_until"] - now).total_seconds()))
+
+        return attempt["count"], remaining
+
+
+def reset_failed_login_attempts(username, client_id):
+    key = _login_attempt_key(username, client_id)
+    with _FAILED_LOGIN_ATTEMPTS_LOCK:
+        _FAILED_LOGIN_ATTEMPTS.pop(key, None)
+
+
+def clear_failed_login_attempts():
+    with _FAILED_LOGIN_ATTEMPTS_LOCK:
+        _FAILED_LOGIN_ATTEMPTS.clear()
+
 
 def login_required(fn):
     @wraps(fn)
