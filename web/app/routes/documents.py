@@ -23,7 +23,6 @@ from ..services.document import (
 logger = get_logger(__name__)
 bp = flask.Blueprint("documents", __name__)
 
-
 # LIST USER DOCUMENTS
 @bp.route("/documents")
 @login_required
@@ -180,6 +179,9 @@ def shared_documents():
     return flask.jsonify(docs)
 
 
+def get_upload_folder():
+    return os.path.abspath(os.path.join("uploads"))
+
 def download_doc(document_id):
     doc = get_document_by_id(document_id)
     user_id = flask.session.get("user_id")
@@ -194,10 +196,15 @@ def download_doc(document_id):
 
     logger.info(f"document.downloaded user_id={user_id} doc_id={document_id}")
 
-    return flask.send_file(
-        f"uploads/{doc['filename']}",
-        as_attachment=True
-    )
+    upload_dir = get_upload_folder()
+    file_path = os.path.join(upload_dir, doc["filename"])
+
+    if not os.path.exists(file_path):
+        logger.error(f"download.missing_file path={file_path}")
+        flask.abort(404)
+
+    return flask.send_file(file_path, as_attachment=True)
+
 
 # MY DOCUMENTS DOWNLOAD
 @bp.route("/documents/<int:document_id>/download")
@@ -297,7 +304,7 @@ def edit_document(document_id):
         if os.path.exists(old_path):
             os.remove(old_path)
 
-        # secure + unique filename
+        # unique filename
         original_name = secure_filename(uploaded_file.filename)
         ext = os.path.splitext(original_name)[1]
 
