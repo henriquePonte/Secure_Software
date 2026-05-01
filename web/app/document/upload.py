@@ -3,15 +3,35 @@ import mimetypes
 
 # CONFIG
 
-ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".txt"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+    ".txt", ".csv",
+    ".doc", ".docx",
+    ".xls", ".xlsx",
+    ".ppt", ".pptx"
+}
 
 ALLOWED_MIME_TYPES = {
     "application/pdf",
+
     "image/png",
     "image/jpeg",
-    "text/plain"
-}
+    "image/gif",
+    "image/webp",
 
+    "text/plain",
+    "text/csv",
+
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
 
