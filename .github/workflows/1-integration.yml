@@ -3,7 +3,7 @@ run-name: "${{ github.workflow }}"
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, develop, pipeline]
   pull_request:
 
 permissions:
