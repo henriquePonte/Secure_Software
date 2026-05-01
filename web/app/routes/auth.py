@@ -4,7 +4,7 @@ from ..extensions import get_db
 from ..services.user import get_user_by_username
 from app.logger.logger import get_logger
 from ..auth.rbac import is_admin_user
-from ..auth.security import login_required, verify_password, validate_login_input
+from ..auth.security import login_required, verify_password, validate_login_input,log_rejected_login_input
 
 bp = flask.Blueprint("auth", __name__)
 
