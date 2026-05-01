@@ -3,6 +3,9 @@ from ..auth.security import login_required
 from ..auth.authorization import user_can_access_document
 from ..services.user import get_all_users_for_sharing
 from app.logger.logger import get_logger
+from app.document.upload import is_allowed_file
+
+
 from ..services.document import (
     get_user_by_id,
     share_document,
@@ -51,6 +54,7 @@ def documents_page():
 @bp.route("/documents/upload", methods=["POST"])
 @login_required
 def upload_document():
+
     user_id = flask.session.get("user_id")
     title = flask.request.form.get("title", "Untitled")
     uploaded_file = flask.request.files.get("document")
@@ -59,12 +63,22 @@ def upload_document():
         logger.warning(f"upload.failed empty_file user_id={user_id}")
         return flask.redirect(flask.url_for("documents.documents_page"))
 
-    logger.info(f"document.uploaded user_id={user_id} title={title}")
+    # SECURITY CHECK
+    ok, reason = is_allowed_file(uploaded_file.filename, uploaded_file)
+
+    if not ok:
+        logger.warning(
+            f"upload.blocked user_id={user_id} file={uploaded_file.filename} reason={reason}"
+        )
+        flask.abort(400)
+
+    logger.info(
+        f"document.uploaded user_id={user_id} title={title} file={uploaded_file.filename}"
+    )
+
     create_document(user_id, title, uploaded_file.filename)
 
     return flask.redirect(flask.url_for("documents.documents_page"))
-
-
 # DETAILS
 @bp.route("/documents/<int:document_id>")
 @login_required
