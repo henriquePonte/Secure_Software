@@ -37,10 +37,9 @@
         <th>ID</th>
         <th>Title</th>
         <th>Filename</th>
-        <th>Summary</th>
-        <th>Full</th>
+        <th>Details</th>
         <th>Download</th>
-        <th>Share</th>
+        <th>Actions</th>
       </tr>
       </thead>
 
@@ -48,75 +47,76 @@
       {% for doc in documents %}
       <tr>
 
-        <!-- ID -->
         <td>{{ doc.id }}</td>
-
-        <!-- TITLE -->
         <td>{{ doc.title }}</td>
-
-        <!-- FILENAME -->
         <td>{{ doc.filename }}</td>
 
-        <!-- SUMMARY -->
         <td>
-          <button class="details-btn" data-title="{{ doc.title }}">
-            Summary
-          </button>
-        </td>
-
-        <!-- DETAILS -->
-        <td>
-          <a href="{{ url_for('documents.document_details', document_id=doc.id) }}">
-            Details
+          <a class="btn btn-gray"
+             href="{{ url_for('documents.document_details', document_id=doc.id) }}">
+            View
           </a>
         </td>
 
-        <!-- DOWNLOAD  -->
         <td>
-          <a href="{{ url_for('documents.download_document', document_id=doc.id) }}">
+          <a class="btn btn-blue"
+             href="{{ url_for('documents.download_document', document_id=doc.id) }}">
             Download
           </a>
         </td>
 
-        <!-- SHARE -->
+        <!-- ACTIONS -->
         <td>
-          {% if doc.is_owner %}
+          <div class="action-group">
 
-          <form method="POST"
-                action="{{ url_for('documents.share_document_route', document_id=doc.id) }}">
+            {% if doc.is_owner %}
 
-            <select name="shared_with" required>
-              <option value="">Select user</option>
+            <!-- SHARE -->
+            <form method="POST"
+                  action="{{ url_for('documents.share_document_route', document_id=doc.id) }}"
+                  class="action-item">
 
-              {% for user in users %}
-              <option value="{{ user.id }}">
-                {{ user.username }}
-              </option>
-              {% endfor %}
+              <select name="shared_with" class="action-select" required>
+                <option value="">Share</option>
+                {% for user in users %}
+                <option value="{{ user.id }}">{{ user.username }}</option>
+                {% endfor %}
+              </select>
 
-            </select>
+              <button type="submit" class="btn btn-blue">
+                Share
+              </button>
 
-            <button type="submit">
-              Share
-            </button>
+            </form>
 
-          </form>
+            <!-- EDIT -->
+            <a class="btn btn-gray"
+               href="{{ url_for('documents.edit_document_page', document_id=doc.id) }}">
+              Edit
+            </a>
 
-          {% else %}
-          <span class="muted">Shared with you</span>
-          {% endif %}
+            <!-- DELETE -->
+            <form method="POST"
+                  action="{{ url_for('documents.delete_document', document_id=doc.id) }}"
+                  class="action-item delete-form">
+
+              <button type="submit" class="btn btn-red">
+                Delete
+              </button>
+
+            </form>
+
+            {% else %}
+            <span class="muted">Shared</span>
+            {% endif %}
+
+          </div>
         </td>
 
       </tr>
       {% endfor %}
       </tbody>
     </table>
-
-    <!-- optional preview panel -->
-    <div id="doc-details" class="card" style="display:none;">
-      <h3>Document details</h3>
-      <p id="doc-title"></p>
-    </div>
 
     {% else %}
     <p>No documents found.</p>
@@ -125,4 +125,19 @@
   </div>
 
 </section>
+
+<script>
+  function confirmDeleteForms() {
+    document.querySelectorAll(".delete-form").forEach(form => {
+      form.addEventListener("submit", function (e) {
+        if (!confirm("Are you sure you want to delete this document?")) {
+          e.preventDefault();
+        }
+      });
+    });
+  }
+
+  confirmDeleteForms();
+</script>
+
 {% endblock %}

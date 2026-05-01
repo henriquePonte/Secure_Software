@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="grid">
+
+    <div class="card">
+
+        <h2>Edit document</h2>
+
+        <p class="muted">
+            Editing document ID: {{ document.id }}
+        </p>
+
+        <!-- EDIT FORM -->
+        <form method="POST"
+              enctype="multipart/form-data"
+              action="{{ url_for('documents.edit_document', document_id=document.id) }}">
+
+            <!-- TITLE -->
+            <label>Title</label>
+            <input type="text"
+                   name="title"
+                   value="{{ document.title }}"
+                   required>
+
+            <!-- CURRENT FILE INFO -->
+            <label>Current file</label>
+            <p class="muted">{{ document.filename }}</p>
+
+            <!-- FILE REPLACE -->
+            <label>Replace file (optional)</label>
+            <input type="file" name="document">
+
+            <button type="submit" class="btn btn-blue">
+                Save changes
+            </button>
+
+            <a href="{{ url_for('documents.documents_page') }}"
+               class="btn btn-gray">
+                Cancel
+            </a>
+
+        </form>
+
+    </div>
+
+</section>
+
+{% endblock %}
