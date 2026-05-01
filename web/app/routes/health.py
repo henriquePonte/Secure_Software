@@ -1,9 +1,11 @@
 import flask
 from ..extensions import get_db
+from ..auth.security import login_required
 
 bp = flask.Blueprint("health", __name__)
 
 @bp.route("/health")
+@login_required
 def health():
     try:
         conn = get_db()

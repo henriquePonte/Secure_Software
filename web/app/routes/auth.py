@@ -2,6 +2,7 @@ import flask
 from ..extensions import get_db
 from ..services.user import get_user_by_username
 from app.logger.logger import get_logger
+from ..auth.security import login_required
 
 bp = flask.Blueprint("auth", __name__)
 
@@ -55,6 +56,7 @@ def login():
 
 
 @bp.route("/logout")
+@login_required
 def logout():
     username = flask.session.get("username")
     flask.session.clear()
