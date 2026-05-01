@@ -23,7 +23,7 @@ def create_app():
             # Ensure cookies are not accessible from JavaScript
             "SESSION_COOKIE_HTTPONLY": True,
             # Only send cookies over HTTPS (set to True for production)
-            "SESSION_COOKIE_SECURE": True,
+            "SESSION_COOKIE_SECURE": False,
             # Helpful mitigation for CSRF in some cases
             "SESSION_COOKIE_SAMESITE": "Lax",
             # We'll manage refresh of last_active ourselves
