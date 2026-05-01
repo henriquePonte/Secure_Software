@@ -1,7 +1,8 @@
 import flask
 from ..auth.security import login_required
 from ..auth.authorization import user_can_access_document
-
+from ..services.user import get_all_users_for_sharing
+from app.logger.logger import get_logger
 from ..services.document import (
     get_user_by_id,
     share_document,
@@ -11,8 +12,7 @@ from ..services.document import (
     get_documents_shared_with_user,
 )
 
-from ..services.user import get_all_users_for_sharing
-
+logger = get_logger(__name__)
 bp = flask.Blueprint("documents", __name__)
 
 
@@ -21,6 +21,8 @@ bp = flask.Blueprint("documents", __name__)
 @login_required
 def documents_page():
     user_id = flask.session.get("user_id")
+
+    logger.info(f"documents.list accessed user_id={user_id}")
 
     my_docs = get_user_documents(user_id)
     shared_docs = get_documents_shared_with_user(user_id)
@@ -54,8 +56,10 @@ def upload_document():
     uploaded_file = flask.request.files.get("document")
 
     if not uploaded_file or uploaded_file.filename == "":
+        logger.warning(f"upload.failed empty_file user_id={user_id}")
         return flask.redirect(flask.url_for("documents.documents_page"))
 
+    logger.info(f"document.uploaded user_id={user_id} title={title}")
     create_document(user_id, title, uploaded_file.filename)
 
     return flask.redirect(flask.url_for("documents.documents_page"))
@@ -68,12 +72,16 @@ def document_details(document_id):
     user_id = flask.session.get("user_id")
 
     if not user_can_access_document(user_id, document_id):
+        logger.warning(f"document.access_denied user_id={user_id} doc_id={document_id}")
         flask.abort(403)
 
     doc = get_document_by_id(document_id)
 
     if not doc:
+        logger.warning(f"document.not_found doc_id={document_id}")
         flask.abort(404)
+
+    logger.info(f"document.viewed user_id={user_id} doc_id={document_id}")
 
     return flask.render_template(
         "document_details.html",
@@ -90,30 +98,37 @@ def share_document_route(document_id):
     doc = get_document_by_id(document_id)
 
     if not doc:
+        logger.warning(f"share.failed doc_not_found doc_id={document_id}")
         flask.abort(404)
 
     if doc["owner_id"] != user_id:
+        logger.warning(f"share.forbidden user_id={user_id} doc_id={document_id}")
         flask.abort(403)
 
     shared_with_id = flask.request.form.get("shared_with")
 
     if not shared_with_id:
+        logger.warning(f"share.invalid_missing_target user_id={user_id} doc_id={document_id}")
         flask.abort(400)
 
     try:
         shared_with_id = int(shared_with_id)
     except ValueError:
+        logger.warning(f"share.invalid_target_format user_id={user_id}")
         flask.abort(400)
 
     user = get_user_by_id(shared_with_id)
 
     if not user:
+        logger.warning(f"share.target_not_found target_id={shared_with_id}")
         flask.abort(404)
 
     if user[2]:  # is_disabled
+        logger.warning(f"share.target_disabled target_id={shared_with_id}")
         flask.abort(403)
 
     share_document(document_id, shared_with_id)
+    logger.info(f"document.shared doc_id={document_id} from={user_id} to={shared_with_id}")
 
     return flask.redirect(
         flask.url_for("documents.document_details", document_id=document_id)
@@ -126,7 +141,11 @@ def share_document_route(document_id):
 def shared_documents():
     user_id = flask.session.get("user_id")
 
+    logger.info(f"shared.documents.access user_id={user_id}")
+
     docs = get_documents_shared_with_user(user_id)
+
+    logger.info(f"shared.documents.returned user_id={user_id} count={len(docs)}")
 
     return flask.jsonify(docs)
 
@@ -136,10 +155,14 @@ def download_doc(document_id):
     user_id = flask.session.get("user_id")
 
     if not doc:
+        logger.warning(f"download.not_found user_id={user_id} doc_id={document_id}")
         flask.abort(404)
 
     if not user_can_access_document(user_id, document_id):
+        logger.warning(f"download.denied user_id={user_id} doc_id={document_id}")
         flask.abort(403)
+
+    logger.info(f"document.downloaded user_id={user_id} doc_id={document_id}")
 
     return flask.send_file(
         f"uploads/{doc['filename']}",
@@ -150,10 +173,15 @@ def download_doc(document_id):
 @bp.route("/documents/<int:document_id>/download")
 @login_required
 def download_document(document_id):
+    user_id = flask.session.get("user_id")
+    logger.info(f"document.download.request user_id={user_id} doc_id={document_id}")
+
     return download_doc(document_id)
 
 # SHARED DOCUMENTS DOWNLOAD
 @bp.route("/shared/<int:document_id>/download")
 @login_required
 def download_shared_document(document_id):
+    user_id = flask.session.get("user_id")
+    logger.info(f"document.download.request user_id={user_id} doc_id={document_id}")
     return download_doc(document_id)
