@@ -48,14 +48,11 @@ def prepare_query(sql, params):
 
 def _log_query(sql, params):
     """
-    Safe debug representation of SQL query.
-    Prevents injection by avoiding string formatting.
+    Debug helper for SQL queries.
     """
-    return {
-        "sql": str(sql),
-        "params": params
-    }
 
+    # safe logging structure
+    return sql, params
 
 # FILE SANITIZATION
 def sanitize_filename(filename):

@@ -40,8 +40,12 @@ def get_all_users_for_sharing(current_user_id):
     return users
 
 def get_user_by_username(cur, username):
-    query = utils.prepare_query("SELECT id, username, password, is_disabled FROM users WHERE username='%s'", username)
-    cur.execute(query)
+    sql = "SELECT id, username, password, is_disabled FROM users WHERE username = %s"
+    params = (username,)
+
+    sql, params = utils.prepare_query(sql, params)
+
+    cur.execute(sql, params)
     return cur.fetchone()
 
 def set_user_disabled(user_id, disabled: bool):
