@@ -1,21 +1,14 @@
 import flask
 from ..services.user import get_all_users,set_user_disabled
 from app.logger.logger import get_logger
-from ..auth.security import login_required
+from ..auth.rbac import admin_required
 
 bp = flask.Blueprint("admin", __name__)
 logger = get_logger(__name__)
 
 @bp.route("/admin/dashboard")
-@login_required
+@admin_required
 def dashboard():
-
-    username = flask.session.get("username")
-
-    if username != "admin":
-        logger.warning(f"Unauthorized dashboard access attempt by {username}")
-        flask.abort(403)
-
     logger.info(f"Admin accessed dashboard")
     users = get_all_users()
 
@@ -25,13 +18,8 @@ def dashboard():
     )
 
 @bp.route("/admin/users")
-@login_required
+@admin_required
 def admin_users():
-
-    if flask.session.get("username") != "admin":
-        logger.warning("Unauthorized attempt to access users list")
-        flask.abort(403)
-
     logger.info("Admin fetched users list")
     users = get_all_users()
 
@@ -45,13 +33,8 @@ def admin_users():
     ])
 
 @bp.route("/admin/users/enable", methods=["POST"])
-@login_required
+@admin_required
 def enable_user():
-
-    if flask.session.get("username") != "admin":
-        logger.warning("Unauthorized enable attempt")
-        flask.abort(403)
-
     user_id = flask.request.form.get("user_id")
 
     if str(user_id) == str(flask.session.get("user_id")):
@@ -64,13 +47,8 @@ def enable_user():
     return flask.jsonify({"success": True, "status": "enabled"})
 
 @bp.route("/admin/users/disable", methods=["POST"])
-@login_required
+@admin_required
 def disable_user():
-
-    if flask.session.get("username") != "admin":
-        logger.warning("Unauthorized disable attempt")
-        flask.abort(403)
-
     user_id = flask.request.form.get("user_id")
 
     if str(user_id) == str(flask.session.get("user_id")):
