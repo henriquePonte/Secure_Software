@@ -102,3 +102,44 @@ def get_documents_shared_with_user(user_id):
     conn.close()
 
     return docs
+
+def delete_document_by_id(document_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                DELETE FROM documents
+                WHERE id = %s
+                """, (document_id,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def update_document_title(document_id, new_title):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                UPDATE documents
+                SET title = %s
+                WHERE id = %s
+                """, (new_title, document_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def update_document_file(document_id, filename):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                UPDATE documents
+                SET filename = %s
+                WHERE id = %s
+                """, (filename, document_id))
+
+    conn.commit()
+    cur.close()
+    conn.close()
