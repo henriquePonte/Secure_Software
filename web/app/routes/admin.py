@@ -1,7 +1,9 @@
 import flask
 from ..services.user import get_all_users,set_user_disabled
+from app.logger.logger import get_logger
 
 bp = flask.Blueprint("admin", __name__)
+logger = get_logger(__name__)
 
 @bp.route("/admin/dashboard")
 def dashboard():
@@ -9,8 +11,10 @@ def dashboard():
     username = flask.session.get("username")
 
     if username != "admin":
+        logger.warning(f"Unauthorized dashboard access attempt by {username}")
         flask.abort(403)
 
+    logger.info(f"Admin accessed dashboard")
     users = get_all_users()
 
     return flask.render_template(
@@ -22,8 +26,10 @@ def dashboard():
 def admin_users():
 
     if flask.session.get("username") != "admin":
+        logger.warning("Unauthorized attempt to access users list")
         flask.abort(403)
 
+    logger.info("Admin fetched users list")
     users = get_all_users()
 
     return flask.jsonify([
@@ -39,13 +45,16 @@ def admin_users():
 def enable_user():
 
     if flask.session.get("username") != "admin":
+        logger.warning("Unauthorized enable attempt")
         flask.abort(403)
 
     user_id = flask.request.form.get("user_id")
 
     if str(user_id) == str(flask.session.get("user_id")):
+        logger.warning(f"Admin tried to enable themselves (user_id={user_id})")
         return flask.jsonify({"error": "Cannot modify yourself"}), 400
 
+    logger.info(f"Admin enabled user_id={user_id}")
     set_user_disabled(user_id, False)
 
     return flask.jsonify({"success": True, "status": "enabled"})
@@ -54,13 +63,16 @@ def enable_user():
 def disable_user():
 
     if flask.session.get("username") != "admin":
+        logger.warning("Unauthorized disable attempt")
         flask.abort(403)
 
     user_id = flask.request.form.get("user_id")
 
     if str(user_id) == str(flask.session.get("user_id")):
+        logger.warning(f"Admin tried to disable themselves (user_id={user_id})")
         return flask.jsonify({"error": "Cannot modify yourself"}), 400
 
+    logger.info(f"Admin disabled user_id={user_id}")
     set_user_disabled(user_id, True)
 
     return flask.jsonify({"success": True, "status": "disabled"})
