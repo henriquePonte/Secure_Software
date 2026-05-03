@@ -23,11 +23,13 @@ def create_app():
             # Ensure cookies are not accessible from JavaScript
             "SESSION_COOKIE_HTTPONLY": True,
             # Only send cookies over HTTPS (set to True for production)
-            "SESSION_COOKIE_SECURE": False,
+            "SESSION_COOKIE_SECURE": True,
             # Helpful mitigation for CSRF in some cases
             "SESSION_COOKIE_SAMESITE": "Lax",
             # We'll manage refresh of last_active ourselves
             "SESSION_REFRESH_EACH_REQUEST": False,
+            # Generate URLs assuming HTTPS-only deployment
+            "PREFERRED_URL_SCHEME": "https",
             # Rate limiting / throttling for repeated failed login attempts
             "LOGIN_MAX_FAILED_ATTEMPTS": 3,
             "LOGIN_LOCKOUT_SECONDS": 300,

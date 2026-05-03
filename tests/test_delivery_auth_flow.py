@@ -1,7 +1,11 @@
 import os
 import requests
+import urllib3
 
-BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+BASE_URL = os.getenv("APP_BASE_URL", "https://localhost:8000")
 
 
 def _url(path: str) -> str:
@@ -32,6 +36,7 @@ def test_login_logout_flow():
         },
         allow_redirects=False,
         timeout=10,
+        verify=False,
     )
 
     assert login_resp.status_code in (302, 303), (
@@ -45,6 +50,7 @@ def test_login_logout_flow():
         _url("/documents"),
         allow_redirects=False,
         timeout=10,
+        verify=False,
     )
 
     assert documents_resp.status_code == 200, (
@@ -58,6 +64,7 @@ def test_login_logout_flow():
         _url("/logout"),
         allow_redirects=False,
         timeout=10,
+        verify=False,
     )
 
     assert logout_resp.status_code in (302, 303), (
@@ -71,6 +78,7 @@ def test_login_logout_flow():
         _url("/documents"),
         allow_redirects=False,
         timeout=10,
+        verify=False,
     )
 
     assert after_logout.status_code in (302, 303), (
