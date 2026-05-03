@@ -10,9 +10,20 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def wait_for_service(url: str, timeout: int = 30):
     deadline = time.time() + timeout
+
+    cert_path = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "web",
+            "certs",
+            "ca.crt"
+        )
+    )
+
     while time.time() < deadline:
         try:
-            response = requests.get(url, timeout=2, verify="ca.crt")
+            response = requests.get(url, timeout=2, verify=cert_path)
             if response.ok:
                 return response
         except requests.RequestException:
