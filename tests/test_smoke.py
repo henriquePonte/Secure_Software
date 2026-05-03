@@ -12,7 +12,7 @@ def wait_for_service(url: str, timeout: int = 30):
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            response = requests.get(url, timeout=2, verify=False)
+            response = requests.get(url, timeout=2, verify="ca.crt")
             if response.ok:
                 return response
         except requests.RequestException:
