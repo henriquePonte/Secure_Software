@@ -86,6 +86,7 @@ def login():
             flask.session.clear()
             flask.session["user_id"] = user[0]
             flask.session["username"] = username
+            flask.session["authenticated_at"] = datetime.utcnow().isoformat()
             # Make the session permanent so Flask will consider the
             # `PERMANENT_SESSION_LIFETIME` configuration value.
             flask.session.permanent = True

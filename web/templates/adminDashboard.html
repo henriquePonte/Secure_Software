@@ -16,7 +16,8 @@
                 <th>ID</th>
                 <th>Username</th>
                 <th>Disabled</th>
-                <th>Action</th>
+                <th>Account</th>
+                <th>Sessions</th>
             </tr>
             </thead>
 
@@ -54,6 +55,21 @@
                         {% else %}
                         Disable
                         {% endif %}
+                    </button>
+                    {% endif %}
+                </td>
+
+                <!-- Session revocation button -->
+                <td>
+                    {% if user.username == "admin" %}
+                    <span style="color:gray;">Protected</span>
+                    {% else %}
+                    <button
+                            id="revoke-btn-{{ user.id }}"
+                            onclick="revokeSessions({{ user.id }})"
+                            style="background:#555; color:white;"
+                    >
+                        Revoke sessions
                     </button>
                     {% endif %}
                 </td>
@@ -116,6 +132,26 @@
 
                     status.innerHTML = '<span style="color:red;">Yes</span>';
                 }
+            })
+            .catch(err => console.error(err));
+    }
+
+    function revokeSessions(userId) {
+        fetch("/admin/users/revoke-sessions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "user_id=" + userId
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+
+                alert("Success: sessions revoked");
             })
             .catch(err => console.error(err));
     }
