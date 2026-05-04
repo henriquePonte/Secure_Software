@@ -40,6 +40,64 @@ def find_sql_injection_indicators(value):
     ]
 
 
+def _get_suspicious_limits(config=None):
+    config = config or {}
+
+    return {
+        "path_max_length": config.get("SUSPICIOUS_PATH_MAX_LENGTH", 256),
+        "query_max_length": config.get("SUSPICIOUS_QUERY_MAX_LENGTH", 1024),
+        "max_query_params": config.get("SUSPICIOUS_MAX_QUERY_PARAMS", 30),
+    }
+
+
+def detect_suspicious_request_patterns(request, config=None):
+    limits = _get_suspicious_limits(config)
+    indicators = set()
+
+    method = (request.method or "").upper()
+    path = request.path or ""
+    query_string = request.query_string.decode("utf-8", errors="ignore")
+
+    if method in {"TRACE", "CONNECT"}:
+        indicators.add("unexpected_http_method")
+
+    if len(path) > limits["path_max_length"]:
+        indicators.add("path_too_long")
+
+    if len(query_string) > limits["query_max_length"]:
+        indicators.add("query_too_long")
+
+    if len(request.args) > limits["max_query_params"]:
+        indicators.add("too_many_query_params")
+
+    normalized_probe = f"{path} {query_string}".lower()
+    if "../" in normalized_probe or "..\\" in normalized_probe or "%2e%2e" in normalized_probe:
+        indicators.add("path_traversal_probe")
+
+    if "<script" in normalized_probe or "%3cscript" in normalized_probe:
+        indicators.add("xss_probe")
+
+    for source, value in (
+        ("path", path),
+        ("query", query_string),
+    ):
+        for marker in find_sql_injection_indicators(value):
+            indicators.add(f"{source}_{marker}")
+
+    for key in request.args:
+        value = request.args.get(key, "")
+        for marker in find_sql_injection_indicators(value):
+            indicators.add(f"query_param_{marker}")
+
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        for key in request.form:
+            value = request.form.get(key, "")
+            for marker in find_sql_injection_indicators(value):
+                indicators.add(f"form_{marker}")
+
+    return sorted(indicators)
+
+
 def validate_login_input(username, password):
     reasons = []
 

@@ -43,6 +43,10 @@ def login():
                 f"Login throttled username={username} client_id={client_id} "
                 f"retry_after_seconds={retry_after}"
             )
+            logger.error(
+                f"suspicious.login_bruteforce_active username={username} "
+                f"client_id={client_id} retry_after_seconds={retry_after}"
+            )
             flask.flash("Too many failed login attempts. Please try again later.", "error")
             return flask.render_template("login.html"), 429
 
@@ -57,6 +61,12 @@ def login():
                 f"client_id={client_id} reasons={validation_errors} "
                 f"failed_count={failed_count} lockout_seconds={lockout_seconds}"
             )
+            if lockout_seconds > 0:
+                logger.error(
+                    f"suspicious.login_bruteforce_threshold_reached username={username} "
+                    f"client_id={client_id} failed_count={failed_count} "
+                    f"lockout_seconds={lockout_seconds}"
+                )
 
             flask.flash("Invalid credentials.", "error")
             return flask.render_template("login.html"), 400
@@ -98,6 +108,12 @@ def login():
             f"client_id={client_id} failed_count={failed_count} "
             f"lockout_seconds={lockout_seconds}"
         )
+        if lockout_seconds > 0:
+            logger.error(
+                f"suspicious.login_bruteforce_threshold_reached username={username} "
+                f"client_id={client_id} failed_count={failed_count} "
+                f"lockout_seconds={lockout_seconds}"
+            )
 
         flask.flash("Invalid credentials.", "error")
         return flask.redirect(flask.url_for("auth.login"))
