@@ -79,7 +79,7 @@ jobs:
 
       - name: Wait for application
         run: |
-          timeout=180
+          timeout=60
           elapsed=0
 
           until curl -kfs https://localhost:8000/health > /dev/null; do
