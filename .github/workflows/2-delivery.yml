@@ -71,9 +71,15 @@ jobs:
         run: |
           docker compose -f docker-compose.deploy.yml up -d
 
+      - name: Debug delivery environment
+        run: |
+          docker compose -f docker-compose.deploy.yml ps
+          docker compose -f docker-compose.deploy.yml logs
+          curl -k -v https://localhost:8000/health || true
+
       - name: Wait for application
         run: |
-          timeout=60
+          timeout=180
           elapsed=0
 
           until curl -kfs https://localhost:8000/health > /dev/null; do
