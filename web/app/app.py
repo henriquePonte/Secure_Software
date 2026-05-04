@@ -2,6 +2,11 @@ import flask
 import pathlib
 from datetime import datetime, timedelta
 from .routes import auth, documents, admin, health
+from .auth.security import detect_suspicious_request_patterns
+from .logger.logger import get_logger
+
+
+logger = get_logger(__name__)
 
 def create_app():
     BASE_DIR = pathlib.Path(__file__).resolve().parents[1]
@@ -34,8 +39,32 @@ def create_app():
             "LOGIN_MAX_FAILED_ATTEMPTS": 3,
             "LOGIN_LOCKOUT_SECONDS": 300,
             "TRUST_PROXY_HEADERS": False,
+            "SUSPICIOUS_PATH_MAX_LENGTH": 256,
+            "SUSPICIOUS_QUERY_MAX_LENGTH": 1024,
+            "SUSPICIOUS_MAX_QUERY_PARAMS": 30,
         }
     )
+
+    @app.before_request
+    def monitor_suspicious_request_patterns():
+        indicators = detect_suspicious_request_patterns(flask.request, app.config)
+
+        if not indicators:
+            return None
+
+        remote_addr = flask.request.headers.get("X-Forwarded-For", flask.request.remote_addr)
+        user_id = flask.session.get("user_id", "anonymous")
+
+        logger.warning(
+            "suspicious.request_detected method=%s path=%s remote_addr=%s user_id=%s indicators=%s",
+            flask.request.method,
+            flask.request.path,
+            remote_addr,
+            user_id,
+            ",".join(indicators),
+        )
+
+        return None
 
     @app.before_request
     def enforce_session_timeout():
