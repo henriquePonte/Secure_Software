@@ -24,6 +24,7 @@ sys.modules.setdefault("psycopg2.extras", extras_stub)
 from app.app import create_app
 import app.app as app_module
 from app.routes import admin as admin_routes
+from app.routes import auth as auth_routes
 
 
 @pytest.fixture
@@ -46,11 +47,24 @@ def login_as(client, user_id, username):
 
 def test_admin_user_can_access_admin_routes(monkeypatch, client):
     users_payload = [
-        {"id": 1, "username": "alice", "is_disabled": False, "session_revoked_at": None},
-        {"id": 2, "username": "bob", "is_disabled": True, "session_revoked_at": None},
+        {
+            "id": 1,
+            "username": "alice",
+            "is_disabled": False,
+            "session_revoked_at": None,
+            "password_reset_required": False,
+        },
+        {
+            "id": 2,
+            "username": "bob",
+            "is_disabled": True,
+            "session_revoked_at": None,
+            "password_reset_required": True,
+        },
     ]
     changes = []
     revoked_sessions = []
+    forced_resets = []
 
     monkeypatch.setattr(admin_routes, "get_all_users", lambda: users_payload)
     monkeypatch.setattr(
@@ -62,6 +76,13 @@ def test_admin_user_can_access_admin_routes(monkeypatch, client):
         admin_routes,
         "revoke_user_sessions",
         lambda user_id: revoked_sessions.append(str(user_id)) or True,
+    )
+    monkeypatch.setattr(admin_routes, "generate_temporary_password", lambda: "TempPass123!X")
+    monkeypatch.setattr(admin_routes, "hash_password", lambda password: f"hash:{password}")
+    monkeypatch.setattr(
+        admin_routes,
+        "force_user_password_reset",
+        lambda user_id, password_hash: forced_resets.append((str(user_id), password_hash)) or True,
     )
 
     login_as(client, user_id=99, username="admin")
@@ -88,8 +109,17 @@ def test_admin_user_can_access_admin_routes(monkeypatch, client):
     assert revoke_response.status_code == 200
     assert revoke_response.get_json()["status"] == "sessions_revoked"
 
+    reset_response = client.post(
+        "/admin/users/force-password-reset",
+        data={"user_id": "1"},
+    )
+    assert reset_response.status_code == 200
+    assert reset_response.get_json()["status"] == "password_reset_required"
+    assert reset_response.get_json()["temporary_password"] == "TempPass123!X"
+
     assert changes == [("2", False), ("1", True)]
     assert revoked_sessions == ["1"]
+    assert forced_resets == [("1", "hash:TempPass123!X")]
 
 
 def test_non_admin_user_cannot_access_admin_routes(monkeypatch, client):
@@ -108,6 +138,11 @@ def test_non_admin_user_cannot_access_admin_routes(monkeypatch, client):
         "revoke_user_sessions",
         lambda user_id: pytest.fail("Non-admin should not revoke sessions"),
     )
+    monkeypatch.setattr(
+        admin_routes,
+        "force_user_password_reset",
+        lambda user_id, password_hash: pytest.fail("Non-admin should not force password reset"),
+    )
 
     login_as(client, user_id=1, username="alice")
 
@@ -119,6 +154,10 @@ def test_non_admin_user_cannot_access_admin_routes(monkeypatch, client):
         "/admin/users/revoke-sessions",
         data={"user_id": "2"},
     ).status_code == 403
+    assert client.post(
+        "/admin/users/force-password-reset",
+        data={"user_id": "2"},
+    ).status_code == 403
 
 
 def test_anonymous_user_is_redirected_to_login_on_admin_routes(client):
@@ -128,6 +167,7 @@ def test_anonymous_user_is_redirected_to_login_on_admin_routes(client):
         client.post("/admin/users/enable", data={"user_id": "2"}),
         client.post("/admin/users/disable", data={"user_id": "2"}),
         client.post("/admin/users/revoke-sessions", data={"user_id": "2"}),
+        client.post("/admin/users/force-password-reset", data={"user_id": "2"}),
     ]
 
     for response in responses:
@@ -150,6 +190,21 @@ def test_admin_cannot_revoke_their_own_sessions(monkeypatch, client):
     assert response.get_json()["error"] == "Cannot revoke your own sessions"
 
 
+def test_admin_cannot_force_password_reset_for_themselves(monkeypatch, client):
+    monkeypatch.setattr(
+        admin_routes,
+        "force_user_password_reset",
+        lambda user_id, password_hash: pytest.fail("Admin should not reset their own password"),
+    )
+
+    login_as(client, user_id=99, username="admin")
+
+    response = client.post("/admin/users/force-password-reset", data={"user_id": "99"})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "Cannot reset your own password here"
+
+
 def test_revoked_session_is_forced_to_login(monkeypatch, client):
     authenticated_at = datetime(2026, 5, 4, 12, 0, 0)
     revoked_at = authenticated_at + timedelta(seconds=1)
@@ -170,6 +225,51 @@ def test_revoked_session_is_forced_to_login(monkeypatch, client):
 
     assert response.status_code in (302, 303)
     assert "/login" in response.headers.get("Location", "")
+
+    with client.session_transaction() as session:
+        assert "user_id" not in session
+
+
+def test_user_with_required_password_reset_can_only_change_password(client):
+    with client.session_transaction() as session:
+        session["user_id"] = 1
+        session["username"] = "alice"
+        session["password_reset_required"] = True
+        session["last_active"] = datetime.utcnow().isoformat()
+
+    response = client.get("/documents")
+
+    assert response.status_code in (302, 303)
+    assert "/change-password" in response.headers.get("Location", "")
+
+
+def test_required_password_reset_changes_password_and_logs_out(monkeypatch, client):
+    completed = []
+
+    monkeypatch.setattr(auth_routes, "hash_password", lambda password: f"hash:{password}")
+    monkeypatch.setattr(
+        auth_routes,
+        "complete_password_reset",
+        lambda user_id, password_hash: completed.append((user_id, password_hash)) or True,
+    )
+
+    with client.session_transaction() as session:
+        session["user_id"] = 1
+        session["username"] = "alice"
+        session["password_reset_required"] = True
+        session["last_active"] = datetime.utcnow().isoformat()
+
+    response = client.post(
+        "/change-password",
+        data={
+            "new_password": "NewSafePass123!",
+            "confirm_password": "NewSafePass123!",
+        },
+    )
+
+    assert response.status_code in (302, 303)
+    assert "/login" in response.headers.get("Location", "")
+    assert completed == [(1, "hash:NewSafePass123!")]
 
     with client.session_transaction() as session:
         assert "user_id" not in session

@@ -3,7 +3,8 @@ CREATE TABLE users (
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     is_disabled BOOLEAN DEFAULT FALSE,
-    session_revoked_at TIMESTAMP DEFAULT NULL
+    session_revoked_at TIMESTAMP DEFAULT NULL,
+    password_reset_required BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE documents (

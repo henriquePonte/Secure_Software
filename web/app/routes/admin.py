@@ -1,5 +1,11 @@
 import flask
-from ..services.user import get_all_users, revoke_user_sessions, set_user_disabled
+from ..auth.security import generate_temporary_password, hash_password
+from ..services.user import (
+    force_user_password_reset,
+    get_all_users,
+    revoke_user_sessions,
+    set_user_disabled,
+)
 from app.logger.logger import get_logger
 from ..auth.rbac import admin_required
 
@@ -29,6 +35,7 @@ def admin_users():
             "username": u["username"],
             "is_disabled": u["is_disabled"],
             "session_revoked_at": u["session_revoked_at"],
+            "password_reset_required": u["password_reset_required"],
         }
         for u in users
     ])
@@ -77,3 +84,29 @@ def revoke_sessions():
 
     logger.info(f"Admin revoked sessions for user_id={user_id}")
     return flask.jsonify({"success": True, "status": "sessions_revoked"})
+
+
+@bp.route("/admin/users/force-password-reset", methods=["POST"])
+@admin_required
+def force_password_reset():
+    user_id = flask.request.form.get("user_id")
+
+    if str(user_id) == str(flask.session.get("user_id")):
+        logger.warning(f"Admin tried to force password reset for themselves (user_id={user_id})")
+        return flask.jsonify({"error": "Cannot reset your own password here"}), 400
+
+    temporary_password = generate_temporary_password()
+    temporary_password_hash = hash_password(temporary_password)
+
+    if not force_user_password_reset(user_id, temporary_password_hash):
+        logger.warning(f"Admin tried to force password reset for missing user_id={user_id}")
+        return flask.jsonify({"error": "User not found"}), 404
+
+    logger.info(f"Admin forced password reset for user_id={user_id}")
+    return flask.jsonify(
+        {
+            "success": True,
+            "status": "password_reset_required",
+            "temporary_password": temporary_password,
+        }
+    )

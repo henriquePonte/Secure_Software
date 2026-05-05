@@ -3,18 +3,18 @@ import psycopg2.extras
 from .. import utils
 from threading import Lock
 
-_SESSION_REVOCATION_SCHEMA_LOCK = Lock()
-_SESSION_REVOCATION_SCHEMA_READY = False
+_ACCOUNT_RECOVERY_SCHEMA_LOCK = Lock()
+_ACCOUNT_RECOVERY_SCHEMA_READY = False
 
 
-def ensure_session_revocation_column():
-    global _SESSION_REVOCATION_SCHEMA_READY
+def ensure_account_recovery_columns():
+    global _ACCOUNT_RECOVERY_SCHEMA_READY
 
-    if _SESSION_REVOCATION_SCHEMA_READY:
+    if _ACCOUNT_RECOVERY_SCHEMA_READY:
         return
 
-    with _SESSION_REVOCATION_SCHEMA_LOCK:
-        if _SESSION_REVOCATION_SCHEMA_READY:
+    with _ACCOUNT_RECOVERY_SCHEMA_LOCK:
+        if _ACCOUNT_RECOVERY_SCHEMA_READY:
             return
 
         conn = get_db()
@@ -24,21 +24,26 @@ def ensure_session_revocation_column():
                     ALTER TABLE users
                     ADD COLUMN IF NOT EXISTS session_revoked_at TIMESTAMP DEFAULT NULL
                     """)
+        cur.execute("""
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS password_reset_required BOOLEAN DEFAULT FALSE
+                    """)
 
         conn.commit()
         cur.close()
         conn.close()
 
-        _SESSION_REVOCATION_SCHEMA_READY = True
+        _ACCOUNT_RECOVERY_SCHEMA_READY = True
 
 def get_all_users():
-    ensure_session_revocation_column()
+    ensure_account_recovery_columns()
 
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("""
-                SELECT id, username, is_disabled, session_revoked_at
+                SELECT id, username, is_disabled, session_revoked_at,
+                       password_reset_required
                 FROM users
                 ORDER BY username
                 """)
@@ -95,7 +100,7 @@ def set_user_disabled(user_id, disabled: bool):
 
 
 def get_user_session_revoked_at(user_id):
-    ensure_session_revocation_column()
+    ensure_account_recovery_columns()
 
     conn = get_db()
     cur = conn.cursor()
@@ -115,7 +120,7 @@ def get_user_session_revoked_at(user_id):
 
 
 def revoke_user_sessions(user_id):
-    ensure_session_revocation_column()
+    ensure_account_recovery_columns()
 
     conn = get_db()
     cur = conn.cursor()
@@ -125,6 +130,73 @@ def revoke_user_sessions(user_id):
                 SET session_revoked_at = CURRENT_TIMESTAMP
                 WHERE id = %s
                 """, (user_id,))
+
+    affected_rows = cur.rowcount
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return affected_rows > 0
+
+
+def is_password_reset_required(user_id):
+    ensure_account_recovery_columns()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                SELECT password_reset_required
+                FROM users
+                WHERE id = %s
+                """, (user_id,))
+
+    row = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return bool(row[0]) if row else False
+
+
+def force_user_password_reset(user_id, temporary_password_hash):
+    ensure_account_recovery_columns()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                UPDATE users
+                SET password = %s,
+                    password_reset_required = TRUE,
+                    session_revoked_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """, (temporary_password_hash, user_id))
+
+    affected_rows = cur.rowcount
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return affected_rows > 0
+
+
+def complete_password_reset(user_id, new_password_hash):
+    ensure_account_recovery_columns()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+                UPDATE users
+                SET password = %s,
+                    password_reset_required = FALSE,
+                    session_revoked_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                  AND password_reset_required = TRUE
+                """, (new_password_hash, user_id))
 
     affected_rows = cur.rowcount
 

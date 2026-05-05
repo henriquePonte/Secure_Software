@@ -97,6 +97,11 @@ def create_app():
                 flask.flash("Your session was revoked. Please log in again.", "error")
                 return flask.redirect(flask.url_for("auth.login"))
 
+        if flask.session.get("password_reset_required"):
+            allowed_endpoints = {"auth.change_password", "auth.logout", "static"}
+            if flask.request.endpoint not in allowed_endpoints:
+                return flask.redirect(flask.url_for("auth.change_password"))
+
         last_active = flask.session.get("last_active")
         if last_active:
             try:
