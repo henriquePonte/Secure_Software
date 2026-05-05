@@ -16,7 +16,10 @@
                 <th>ID</th>
                 <th>Username</th>
                 <th>Disabled</th>
-                <th>Action</th>
+                <th>Account</th>
+                <th>Reset required</th>
+                <th>Sessions</th>
+                <th>Password reset</th>
             </tr>
             </thead>
 
@@ -58,10 +61,55 @@
                     {% endif %}
                 </td>
 
+                <!-- Password reset status -->
+                <td id="reset-status-{{ user.id }}">
+                    {% if user.password_reset_required %}
+                    <span style="color:red;">Required</span>
+                    {% else %}
+                    <span style="color:green;">No</span>
+                    {% endif %}
+                </td>
+
+                <!-- Session revocation button -->
+                <td>
+                    {% if user.username == "admin" %}
+                    <span style="color:gray;">Protected</span>
+                    {% else %}
+                    <button
+                            id="revoke-btn-{{ user.id }}"
+                            onclick="revokeSessions({{ user.id }})"
+                            style="background:#555; color:white;"
+                    >
+                        Revoke sessions
+                    </button>
+                    {% endif %}
+                </td>
+
+                <!-- Password reset button -->
+                <td>
+                    {% if user.username == "admin" %}
+                    <span style="color:gray;">Protected</span>
+                    {% else %}
+                    <button
+                            id="reset-btn-{{ user.id }}"
+                            onclick="forcePasswordReset({{ user.id }})"
+                            style="background:#1f3a5f; color:white;"
+                    >
+                        Force reset
+                    </button>
+                    {% endif %}
+                </td>
+
             </tr>
             {% endfor %}
             </tbody>
         </table>
+
+        <div id="temporary-password-box" style="display:none; margin-top:1rem; padding:1rem; border:1px solid #ddd; background:#f6f7fb;">
+            <strong>Temporary password</strong>
+            <p class="muted">Show this once to the user through an external channel.</p>
+            <code id="temporary-password-value" style="display:block; padding:0.75rem; background:white;"></code>
+        </div>
 
         {% else %}
         <p>No users found.</p>
@@ -116,6 +164,52 @@
 
                     status.innerHTML = '<span style="color:red;">Yes</span>';
                 }
+            })
+            .catch(err => console.error(err));
+    }
+
+    function revokeSessions(userId) {
+        fetch("/admin/users/revoke-sessions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "user_id=" + userId
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+
+                alert("Success: sessions revoked");
+            })
+            .catch(err => console.error(err));
+    }
+
+    function forcePasswordReset(userId) {
+        fetch("/admin/users/force-password-reset", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: "user_id=" + userId
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert("Error: " + data.error);
+                    return;
+                }
+
+                const resetStatus = document.getElementById("reset-status-" + userId);
+                resetStatus.innerHTML = '<span style="color:red;">Required</span>';
+
+                const passwordBox = document.getElementById("temporary-password-box");
+                const passwordValue = document.getElementById("temporary-password-value");
+                passwordValue.textContent = data.temporary_password;
+                passwordBox.style.display = "block";
             })
             .catch(err => console.error(err));
     }

@@ -2,6 +2,8 @@ import flask
 from functools import wraps
 import bcrypt
 import re
+import secrets
+import string
 from datetime import datetime, timedelta
 from threading import Lock
 
@@ -11,6 +13,9 @@ _MAX_FAILED_LOGIN_ATTEMPTS = 3
 _LOGIN_LOCKOUT_SECONDS = 300
 _FAILED_LOGIN_ATTEMPTS = {}
 _FAILED_LOGIN_ATTEMPTS_LOCK = Lock()
+_TEMPORARY_PASSWORD_ALPHABET = (
+    string.ascii_letters + string.digits + "!#$%&()*+,-.:;<=>?@[]^_{|}~"
+)
 
 _SQL_INJECTION_SIGNATURES = {
     "sql_comment": re.compile(r"(--|#|/\*|\*/)", re.IGNORECASE),
@@ -120,6 +125,31 @@ def validate_login_input(username, password):
         reasons.append(f"username_{indicator}")
 
     return reasons
+
+
+def validate_new_password(password):
+    reasons = []
+
+    if not isinstance(password, str):
+        return ["invalid_password_type"]
+
+    if not password:
+        reasons.append("missing_password")
+
+    if len(password) < 12:
+        reasons.append("password_too_short")
+
+    if len(password) > _MAX_PASSWORD_LENGTH:
+        reasons.append("password_too_long")
+
+    if "\x00" in password:
+        reasons.append("null_byte")
+
+    return reasons
+
+
+def generate_temporary_password(length=16):
+    return "".join(secrets.choice(_TEMPORARY_PASSWORD_ALPHABET) for _ in range(length))
 
 
 def log_rejected_login_input(reasons):

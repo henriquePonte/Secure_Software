@@ -1,16 +1,22 @@
 import flask
 from datetime import datetime
 from ..extensions import get_db
-from ..services.user import get_user_by_username
+from ..services.user import (
+    complete_password_reset,
+    get_user_by_username,
+    is_password_reset_required,
+)
 from app.logger.logger import get_logger
 from ..auth.rbac import is_admin_user
 from ..auth.security import (
     get_login_client_id,
+    hash_password,
     is_login_temporarily_blocked,
     log_rejected_login_input,
     login_required,
     record_failed_login_attempt,
     reset_failed_login_attempts,
+    validate_new_password,
     validate_login_input,
     verify_password,
 )
@@ -86,6 +92,8 @@ def login():
             flask.session.clear()
             flask.session["user_id"] = user[0]
             flask.session["username"] = username
+            flask.session["authenticated_at"] = datetime.utcnow().isoformat()
+            flask.session["password_reset_required"] = is_password_reset_required(user[0])
             # Make the session permanent so Flask will consider the
             # `PERMANENT_SESSION_LIFETIME` configuration value.
             flask.session.permanent = True
@@ -93,6 +101,10 @@ def login():
             flask.session["last_active"] = datetime.utcnow().isoformat()
 
             logger.info(f"Login successful for user_id={user[0]}, username={username}")
+
+            if flask.session["password_reset_required"]:
+                logger.info(f"User redirected to change password: user_id={user[0]}")
+                return flask.redirect(flask.url_for("auth.change_password"))
 
             if is_admin_user():
                 logger.info("Admin redirected to dashboard")
@@ -119,6 +131,46 @@ def login():
         return flask.redirect(flask.url_for("auth.login"))
 
     return flask.render_template("login.html")
+
+
+@bp.route("/change-password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    if not flask.session.get("password_reset_required"):
+        return flask.redirect(flask.url_for("documents.documents_page"))
+
+    if flask.request.method == "POST":
+        new_password = flask.request.form.get("new_password", "")
+        confirm_password = flask.request.form.get("confirm_password", "")
+
+        validation_errors = validate_new_password(new_password)
+
+        if new_password != confirm_password:
+            validation_errors.append("password_confirmation_mismatch")
+
+        if validation_errors:
+            logger.warning(
+                f"Password reset rejected for user_id={flask.session.get('user_id')} "
+                f"reasons={validation_errors}"
+            )
+            flask.flash("Choose a valid password and make sure both fields match.", "error")
+            return flask.render_template("change_password.html"), 400
+
+        user_id = flask.session["user_id"]
+        new_password_hash = hash_password(new_password)
+
+        if not complete_password_reset(user_id, new_password_hash):
+            flask.session.clear()
+            flask.flash("Password reset could not be completed. Please log in again.", "error")
+            return flask.redirect(flask.url_for("auth.login"))
+
+        username = flask.session.get("username")
+        flask.session.clear()
+        logger.info(f"Password reset completed for user_id={user_id}, username={username}")
+        flask.flash("Password changed. Please log in with your new password.", "success")
+        return flask.redirect(flask.url_for("auth.login"))
+
+    return flask.render_template("change_password.html")
 
 
 @bp.route("/logout")

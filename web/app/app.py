@@ -3,10 +3,21 @@ import pathlib
 from datetime import datetime, timedelta
 from .routes import auth, documents, admin, health
 from .auth.security import detect_suspicious_request_patterns
+from .services.user import get_user_session_revoked_at
 from .logger.logger import get_logger
 
 
 logger = get_logger(__name__)
+
+
+def _parse_session_timestamp(value):
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
 
 def create_app():
     BASE_DIR = pathlib.Path(__file__).resolve().parents[1]
@@ -71,6 +82,25 @@ def create_app():
         # Only check authenticated sessions
         if "user_id" not in flask.session:
             return None
+
+        authenticated_at = _parse_session_timestamp(flask.session.get("authenticated_at"))
+        if authenticated_at:
+            revoked_at = get_user_session_revoked_at(flask.session["user_id"])
+            if revoked_at and authenticated_at <= revoked_at:
+                username = flask.session.get("username")
+                flask.session.clear()
+                app.logger.info(f"Session revoked for user: {username}")
+
+                if flask.request.endpoint == "auth.login":
+                    return None
+
+                flask.flash("Your session was revoked. Please log in again.", "error")
+                return flask.redirect(flask.url_for("auth.login"))
+
+        if flask.session.get("password_reset_required"):
+            allowed_endpoints = {"auth.change_password", "auth.logout", "static"}
+            if flask.request.endpoint not in allowed_endpoints:
+                return flask.redirect(flask.url_for("auth.change_password"))
 
         last_active = flask.session.get("last_active")
         if last_active:
