@@ -99,6 +99,36 @@ jobs:
         run: |
           curl -kf https://localhost:8000/health
 
+      - name: Run DAST Security Scan with OWASP ZAP
+        continue-on-error: true
+        run: |
+          mkdir -p zap-reports
+          docker run --rm \
+            --network host \
+            -v "$PWD/zap-reports:/zap/reports" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t https://localhost:8000 -r zap-report.html -I || true
+          
+          # Check if critical vulnerabilities exist
+          if [ -f "zap-reports/zap-report.html" ]; then
+            # Count critical issues (you can adjust this threshold)
+            CRITICAL_COUNT=$(grep -o "CRITICAL" zap-reports/zap-report.html 2>/dev/null | wc -l || echo "0")
+            echo "Critical vulnerabilities found: $CRITICAL_COUNT"
+            
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo "⚠️  Critical security issues detected by ZAP DAST"
+              exit 1
+            fi
+          fi
+
+      - name: Upload DAST Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-security-report
+          path: zap-reports/
+          retention-days: 30
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
