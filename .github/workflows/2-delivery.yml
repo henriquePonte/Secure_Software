@@ -116,7 +116,7 @@ jobs:
             echo "Critical vulnerabilities found: $CRITICAL_COUNT"
             
             if [ "$CRITICAL_COUNT" -gt 0 ]; then
-              echo "⚠️  Critical security issues detected by ZAP DAST"
+              echo "Critical security issues detected by ZAP DAST"
               exit 1
             fi
           fi
