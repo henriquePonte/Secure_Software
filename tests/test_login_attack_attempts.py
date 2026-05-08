@@ -23,7 +23,7 @@ sys.modules.setdefault("psycopg2.extras", extras_stub)
 
 logger_stub = types.ModuleType("app.logger.logger")
 logger_stub.get_logger = lambda name: logging.getLogger(name)
-sys.modules.setdefault("app.logger.logger", logger_stub)
+sys.modules["app.logger.logger"] = logger_stub
 
 from app.app import create_app
 from app.auth.security import clear_failed_login_attempts
