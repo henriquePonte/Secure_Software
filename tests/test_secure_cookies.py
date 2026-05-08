@@ -1,6 +1,7 @@
 import pathlib
 import sys
 import types
+import logging
 
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "web"))
@@ -17,6 +18,10 @@ psycopg2_stub.extras = extras_stub
 
 sys.modules.setdefault("psycopg2", psycopg2_stub)
 sys.modules.setdefault("psycopg2.extras", extras_stub)
+
+logger_stub = types.ModuleType("app.logger.logger")
+logger_stub.get_logger = lambda name: logging.getLogger(name)
+sys.modules["app.logger.logger"] = logger_stub
 
 from app.app import create_app
 

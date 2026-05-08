@@ -6,6 +6,7 @@ from ..services.user import (
     get_user_by_username,
     is_password_reset_required,
 )
+from ..services.security_alerts import create_security_alert
 from app.logger.logger import get_logger
 from ..auth.rbac import is_admin_user
 from ..auth.security import (
@@ -45,6 +46,14 @@ def login():
 
         is_blocked, retry_after = is_login_temporarily_blocked(username, client_id)
         if is_blocked:
+            create_security_alert(
+                "brute_force",
+                "Blocked login attempt during active lockout",
+                severity="critical",
+                username=username,
+                client_id=client_id,
+                retry_after_seconds=retry_after,
+            )
             logger.warning(
                 f"Login throttled username={username} client_id={client_id} "
                 f"retry_after_seconds={retry_after}"
@@ -68,6 +77,16 @@ def login():
                 f"failed_count={failed_count} lockout_seconds={lockout_seconds}"
             )
             if lockout_seconds > 0:
+                create_security_alert(
+                    "brute_force",
+                    "Login brute force threshold reached",
+                    severity="critical",
+                    username=username,
+                    client_id=client_id,
+                    failed_count=failed_count,
+                    lockout_seconds=lockout_seconds,
+                    reasons=validation_errors,
+                )
                 logger.error(
                     f"suspicious.login_bruteforce_threshold_reached username={username} "
                     f"client_id={client_id} failed_count={failed_count} "
@@ -121,6 +140,15 @@ def login():
             f"lockout_seconds={lockout_seconds}"
         )
         if lockout_seconds > 0:
+            create_security_alert(
+                "brute_force",
+                "Login brute force threshold reached",
+                severity="critical",
+                username=username,
+                client_id=client_id,
+                failed_count=failed_count,
+                lockout_seconds=lockout_seconds,
+            )
             logger.error(
                 f"suspicious.login_bruteforce_threshold_reached username={username} "
                 f"client_id={client_id} failed_count={failed_count} "
