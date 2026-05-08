@@ -2,7 +2,12 @@ import flask
 import pathlib
 from datetime import datetime, timedelta
 from .routes import auth, documents, admin, health
-from .auth.security import detect_suspicious_request_patterns
+from .auth.security import (
+    detect_suspicious_request_patterns,
+    get_request_client_id,
+    record_request_for_volume_alert,
+)
+from .services.security_alerts import create_security_alert
 from .services.user import get_user_session_revoked_at
 from .logger.logger import get_logger
 
@@ -53,24 +58,65 @@ def create_app():
             "SUSPICIOUS_PATH_MAX_LENGTH": 256,
             "SUSPICIOUS_QUERY_MAX_LENGTH": 1024,
             "SUSPICIOUS_MAX_QUERY_PARAMS": 30,
+            "SECURITY_REQUEST_VOLUME_WINDOW_SECONDS": 60,
+            "SECURITY_REQUEST_VOLUME_THRESHOLD": 100,
+            "SECURITY_REQUEST_VOLUME_ALERT_COOLDOWN_SECONDS": 300,
         }
     )
 
     @app.before_request
     def monitor_suspicious_request_patterns():
+        if flask.request.endpoint == "static":
+            return None
+
+        client_id = get_request_client_id(flask.request, app.config)
+        should_alert, request_count, window_seconds = record_request_for_volume_alert(
+            client_id,
+            app.config,
+        )
+
+        if should_alert:
+            create_security_alert(
+                "request_volume",
+                "High request volume detected",
+                severity="warning",
+                client_id=client_id,
+                request_count=request_count,
+                window_seconds=window_seconds,
+                path=flask.request.path,
+                method=flask.request.method,
+            )
+            logger.warning(
+                "suspicious.high_request_volume client_id=%s request_count=%s "
+                "window_seconds=%s path=%s",
+                client_id,
+                request_count,
+                window_seconds,
+                flask.request.path,
+            )
+
         indicators = detect_suspicious_request_patterns(flask.request, app.config)
 
         if not indicators:
             return None
 
-        remote_addr = flask.request.headers.get("X-Forwarded-For", flask.request.remote_addr)
         user_id = flask.session.get("user_id", "anonymous")
+        create_security_alert(
+            "suspicious_request",
+            "Suspicious request pattern detected",
+            severity="warning",
+            client_id=client_id,
+            user_id=user_id,
+            method=flask.request.method,
+            path=flask.request.path,
+            indicators=indicators,
+        )
 
         logger.warning(
             "suspicious.request_detected method=%s path=%s remote_addr=%s user_id=%s indicators=%s",
             flask.request.method,
             flask.request.path,
-            remote_addr,
+            client_id,
             user_id,
             ",".join(indicators),
         )
