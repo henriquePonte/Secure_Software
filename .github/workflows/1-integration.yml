@@ -29,6 +29,12 @@ jobs:
           docker compose build --pull
           docker compose up -d
 
+      - name: Debug containers
+        run: |
+          docker compose ps
+          docker compose logs web
+          docker compose logs db
+
       - name: Wait for application
         run: |
           timeout=60
