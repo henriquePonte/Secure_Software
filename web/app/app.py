@@ -33,6 +33,7 @@ def create_app():
         static_folder=str(BASE_DIR / "static"),
     )
 
+    # TODO isto devia tar no env
     # Basic secret (keep using proper secret in production via env var)
     app.secret_key = "dev-secret"
 
