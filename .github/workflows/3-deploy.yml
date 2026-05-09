@@ -81,9 +81,6 @@ jobs:
           docker compose -f docker-compose.deploy.yml down || true
 
       - name: Start deployment
-        env:
-          WEB_IMAGE: ${{ env.WEB_IMAGE }}
-          DB_IMAGE: ${{ env.DB_IMAGE }}
         run: |
           docker compose -f docker-compose.deploy.yml up -d
 
