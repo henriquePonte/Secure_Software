@@ -26,7 +26,8 @@ jobs:
 
       - name: Start application stack for validation
         run: |
-          docker compose up -d --build
+          docker compose build --pull
+          docker compose up -d
 
       - name: Wait for application
         run: |
@@ -115,6 +116,7 @@ jobs:
         with:
           context: ./db
           push: true
+          pull: true
           tags: |
             ${{ env.DB_SHA_TAG }}
           provenance: false
