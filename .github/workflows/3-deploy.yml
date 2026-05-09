@@ -7,6 +7,12 @@ on:
       image_tag:
         description: "Image tag to deploy (e.g., dev or a specific commit SHA)"
         required: true
+  workflow_run:
+    workflows: ["2 - Continuous Delivery"]
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -20,6 +26,11 @@ env:
 
 jobs:
   deploy:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: self-hosted
 
     steps:
@@ -32,8 +43,13 @@ jobs:
           pytest -v tests_dynamic
 
       - name: Set lowercase image namespace
-        run: |
-          echo "IMAGE_NAMESPACE_LC=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+        ruif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+          else
+            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
+          fi
+          echo "WEB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "DB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:${IMAGE_TAG
 
       - name: Resolve deployment images
         run: |
