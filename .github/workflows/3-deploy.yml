@@ -94,6 +94,18 @@ jobs:
           docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:prod"
           docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:prod"
 
+      - name: Trigger Render deploy
+        if: success()
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "No RENDER_DEPLOY_HOOK_URL secret set — skipping Render deploy trigger."
+          else
+            echo "Triggering Render deploy hook..."
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL" || echo "Render hook call failed"
+          fi
+
       - name: Show deployed container status on failure
         if: failure()
         run: |
