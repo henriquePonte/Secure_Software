@@ -26,6 +26,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Run dynamic API security tests
+        working-directory: tests
+        run: |
+          pytest -v tests_dynamic
+
       - name: Set lowercase image namespace
         run: |
           echo "IMAGE_NAMESPACE_LC=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
