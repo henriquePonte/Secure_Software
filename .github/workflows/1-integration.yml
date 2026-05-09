@@ -120,3 +120,29 @@ jobs:
           tags: |
             ${{ env.DB_SHA_TAG }}
           provenance: false
+
+      - name: Prepare SBOM output directory
+        run: |
+          mkdir -p sbom
+
+      - name: Generate web SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.WEB_SHA_TAG }}
+          format: cyclonedx-json
+          output-file: sbom/web-${{ github.sha }}.cdx.json
+
+      - name: Generate db SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.DB_SHA_TAG }}
+          format: cyclonedx-json
+          output-file: sbom/db-${{ github.sha }}.cdx.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom/*.cdx.json
+          if-no-files-found: error
+          retention-days: 30
