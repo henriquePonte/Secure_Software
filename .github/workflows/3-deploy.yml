@@ -37,24 +37,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Set lowercase image namespace
+        run: |
+          echo "IMAGE_NAMESPACE_LC=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - name: Resolve image tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> "$GITHUB_ENV"
+          else
+            echo "IMAGE_TAG=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Run dynamic API security tests
         working-directory: tests
         run: |
           pytest -v tests_dynamic
 
-      - name: Set lowercase image namespace
-        ruif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
-          else
-            IMAGE_TAG="${{ github.event.workflow_run.head_sha }}"
-          fi
-          echo "WEB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
-          echo "DB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:${IMAGE_TAG
-
       - name: Resolve deployment images
         run: |
-          echo "WEB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:${{ github.event.inputs.image_tag }}" >> "$GITHUB_ENV"
-          echo "DB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:${{ github.event.inputs.image_tag }}" >> "$GITHUB_ENV"
+          echo "WEB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "DB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
 
       - name: Show deployment target
         run: |
