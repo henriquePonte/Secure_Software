@@ -56,8 +56,8 @@ jobs:
 
       - name: Resolve deployment images
         run: |
-          echo "WEB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
-          echo "DB_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "WEB_IMAGE=$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:$IMAGE_TAG" >> "$GITHUB_ENV"
+          echo "DB_IMAGE=$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:$IMAGE_TAG" >> "$GITHUB_ENV"
 
       - name: Show deployment target
         run: |
@@ -109,11 +109,11 @@ jobs:
       - name: Promote deployed images to prod
         if: success()
         run: |
-          docker tag "$WEB_IMAGE" "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:prod"
-          docker tag "$DB_IMAGE" "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:prod"
+          docker tag "$WEB_IMAGE" "$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:prod"
+          docker tag "$DB_IMAGE" "$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:prod"
 
-          docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.WEB_IMAGE_NAME }}:prod"
-          docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE_LC }}/${{ env.DB_IMAGE_NAME }}:prod"
+          docker push "$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:prod"
+          docker push "$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:prod"
 
       - name: Trigger Render deploy
         if: success()
