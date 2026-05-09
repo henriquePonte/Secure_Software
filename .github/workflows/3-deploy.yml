@@ -49,29 +49,17 @@ jobs:
             echo "IMAGE_TAG=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
           fi
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Install test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest requests
-
-      - name: Run dynamic API security tests
-        working-directory: tests
-        run: |
-          pytest -v tests_dynamic
-
-      - name: Show deployment target
+      - name: Resolve deployment images
         run: |
           WEB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:$IMAGE_TAG"
           DB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:$IMAGE_TAG"
-          echo "Deploying WEB_IMAGE=$WEB_IMAGE"
-          echo "Deploying DB_IMAGE=$DB_IMAGE"
           echo "WEB_IMAGE=$WEB_IMAGE" >> "$GITHUB_ENV"
           echo "DB_IMAGE=$DB_IMAGE" >> "$GITHUB_ENV"
+
+      - name: Show deployment target
+        run: |
+          echo "Deploying WEB_IMAGE=$WEB_IMAGE"
+          echo "Deploying DB_IMAGE=$DB_IMAGE"
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -82,8 +70,6 @@ jobs:
 
       - name: Pull deployment images
         run: |
-          WEB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:$IMAGE_TAG"
-          DB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:$IMAGE_TAG"
           docker pull "$WEB_IMAGE"
           docker pull "$DB_IMAGE"
 
@@ -93,9 +79,6 @@ jobs:
 
       - name: Start deployment
         run: |
-          WEB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:$IMAGE_TAG"
-          DB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:$IMAGE_TAG"
-          export WEB_IMAGE DB_IMAGE
           docker compose -f docker-compose.deploy.yml up -d
 
       - name: Wait for application
@@ -123,8 +106,6 @@ jobs:
       - name: Promote deployed images to prod
         if: success()
         run: |
-          WEB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:$IMAGE_TAG"
-          DB_IMAGE="$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:$IMAGE_TAG"
           docker tag "$WEB_IMAGE" "$REGISTRY/$IMAGE_NAMESPACE_LC/$WEB_IMAGE_NAME:prod"
           docker tag "$DB_IMAGE" "$REGISTRY/$IMAGE_NAMESPACE_LC/$DB_IMAGE_NAME:prod"
 

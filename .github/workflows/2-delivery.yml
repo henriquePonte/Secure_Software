@@ -163,6 +163,11 @@ jobs:
         run: |
           pytest -q tests/test_delivery_auth_flow.py
 
+      - name: Run dynamic API security tests
+        working-directory: tests
+        run: |
+          pytest -v tests_dynamic
+
       - name: Promote validated images to dev
         if: success()
         run: |
