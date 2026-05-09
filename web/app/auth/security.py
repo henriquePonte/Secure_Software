@@ -13,6 +13,11 @@ _MAX_FAILED_LOGIN_ATTEMPTS = 3
 _LOGIN_LOCKOUT_SECONDS = 300
 _FAILED_LOGIN_ATTEMPTS = {}
 _FAILED_LOGIN_ATTEMPTS_LOCK = Lock()
+_REQUEST_VOLUME = {}
+_REQUEST_VOLUME_LOCK = Lock()
+_REQUEST_VOLUME_WINDOW_SECONDS = 60
+_REQUEST_VOLUME_THRESHOLD = 100
+_REQUEST_VOLUME_ALERT_COOLDOWN_SECONDS = 300
 _TEMPORARY_PASSWORD_ALPHABET = (
     string.ascii_letters + string.digits + "!#$%&()*+,-.:;<=>?@[]^_{|}~"
 )
@@ -173,6 +178,73 @@ def get_login_client_id():
     return flask.request.remote_addr or "unknown"
 
 
+def get_request_client_id(request=None, config=None):
+    request = request or flask.request
+    config = config or flask.current_app.config
+    trust_proxy_headers = config.get("TRUST_PROXY_HEADERS", False)
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+
+    if trust_proxy_headers and forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+
+    return request.remote_addr or "unknown"
+
+
+def _request_volume_config(config=None):
+    config = config or {}
+
+    return {
+        "window_seconds": config.get(
+            "SECURITY_REQUEST_VOLUME_WINDOW_SECONDS",
+            _REQUEST_VOLUME_WINDOW_SECONDS,
+        ),
+        "threshold": config.get(
+            "SECURITY_REQUEST_VOLUME_THRESHOLD",
+            _REQUEST_VOLUME_THRESHOLD,
+        ),
+        "cooldown_seconds": config.get(
+            "SECURITY_REQUEST_VOLUME_ALERT_COOLDOWN_SECONDS",
+            _REQUEST_VOLUME_ALERT_COOLDOWN_SECONDS,
+        ),
+    }
+
+
+def record_request_for_volume_alert(client_id, config=None, now=None):
+    now = now or datetime.utcnow()
+    limits = _request_volume_config(config)
+    window = timedelta(seconds=limits["window_seconds"])
+    cooldown = timedelta(seconds=limits["cooldown_seconds"])
+
+    with _REQUEST_VOLUME_LOCK:
+        entry = _REQUEST_VOLUME.get(
+            client_id,
+            {
+                "timestamps": [],
+                "last_alert_at": None,
+            },
+        )
+
+        cutoff = now - window
+        entry["timestamps"] = [
+            timestamp for timestamp in entry["timestamps"] if timestamp > cutoff
+        ]
+        entry["timestamps"].append(now)
+
+        count = len(entry["timestamps"])
+        should_alert = count >= limits["threshold"]
+        last_alert_at = entry.get("last_alert_at")
+
+        if should_alert and (
+            not last_alert_at or now - last_alert_at >= cooldown
+        ):
+            entry["last_alert_at"] = now
+            _REQUEST_VOLUME[client_id] = entry
+            return True, count, limits["window_seconds"]
+
+        _REQUEST_VOLUME[client_id] = entry
+        return False, count, limits["window_seconds"]
+
+
 def _login_attempt_key(username, client_id):
     normalized_username = username.strip().lower() if isinstance(username, str) else ""
     return f"{client_id}:{normalized_username}"
@@ -246,6 +318,11 @@ def reset_failed_login_attempts(username, client_id):
 def clear_failed_login_attempts():
     with _FAILED_LOGIN_ATTEMPTS_LOCK:
         _FAILED_LOGIN_ATTEMPTS.clear()
+
+
+def clear_request_volume_tracking():
+    with _REQUEST_VOLUME_LOCK:
+        _REQUEST_VOLUME.clear()
 
 
 def login_required(fn):

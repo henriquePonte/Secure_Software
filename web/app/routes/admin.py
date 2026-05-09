@@ -6,6 +6,10 @@ from ..services.user import (
     revoke_user_sessions,
     set_user_disabled,
 )
+from ..services.security_alerts import (
+    clear_security_alerts,
+    get_recent_security_alerts,
+)
 from app.logger.logger import get_logger
 from ..auth.rbac import admin_required
 
@@ -17,11 +21,21 @@ logger = get_logger(__name__)
 def dashboard():
     logger.info(f"Admin accessed dashboard")
     users = get_all_users()
+    security_alerts = get_recent_security_alerts()
 
     return flask.render_template(
         "adminDashboard.html",
         users=users,
+        security_alerts=security_alerts,
     )
+
+
+@bp.route("/admin/security-alerts/clear", methods=["POST"])
+@admin_required
+def clear_admin_security_alerts():
+    clear_security_alerts()
+    logger.info("Admin cleared security alerts")
+    return flask.jsonify({"success": True})
 
 @bp.route("/admin/users")
 @admin_required

@@ -4,6 +4,35 @@
 
 <h2>Admin Dashboard</h2>
 
+{% if security_alerts %}
+<section class="security-alert-panel" aria-live="polite">
+    <div class="security-alert-header">
+        <div>
+            <h3>Security notifications</h3>
+            <p class="muted">Recent suspicious activity detected by the application.</p>
+        </div>
+        <button class="clear-alerts-button" onclick="clearSecurityAlerts()">Clear</button>
+    </div>
+
+    <ul class="security-alert-list">
+        {% for alert in security_alerts %}
+        <li class="security-alert security-alert-{{ alert.severity }}">
+            <div class="security-alert-title">
+                <strong>{{ alert.message }}</strong>
+                <span>{{ alert.timestamp.strftime("%Y-%m-%d %H:%M:%S") }} UTC</span>
+            </div>
+            <div class="security-alert-details">
+                <span>{{ alert.category }}</span>
+                {% for key, value in alert.details.items() %}
+                <span>{{ key }}={{ value }}</span>
+                {% endfor %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
 <section class="grid">
 
     <div class="card">
@@ -210,6 +239,25 @@
                 const passwordValue = document.getElementById("temporary-password-value");
                 passwordValue.textContent = data.temporary_password;
                 passwordBox.style.display = "block";
+            })
+            .catch(err => console.error(err));
+    }
+
+    function clearSecurityAlerts() {
+        fetch("/admin/security-alerts/clear", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const panel = document.querySelector(".security-alert-panel");
+                    if (panel) {
+                        panel.remove();
+                    }
+                }
             })
             .catch(err => console.error(err));
     }
