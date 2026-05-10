@@ -47,7 +47,7 @@ jobs:
 
       - name: Install dependencies and pip-audit
         run: |
-          pip install -r requirements.txt
+          pip install -r web/requirements.txt
           pip install pip-audit
 
       - name: Run pip-audit
