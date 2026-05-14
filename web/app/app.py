@@ -36,7 +36,7 @@ def create_app():
     )
 
     # Basic secret 
-    app.secret_key = os.getenv("SECRET_KEY", "dev-secret"),
+    app.secret_key = os.getenv("SECRET_KEY", "dev-secret")
 
     # Session security & expiration configuration
     app.config.update(
