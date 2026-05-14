@@ -1,3 +1,5 @@
+import os
+
 import flask
 import pathlib
 from datetime import datetime, timedelta
@@ -33,9 +35,8 @@ def create_app():
         static_folder=str(BASE_DIR / "static"),
     )
 
-    # TODO isto devia tar no env
-    # Basic secret (keep using proper secret in production via env var)
-    app.secret_key = "dev-secret"
+    # Basic secret 
+    app.secret_key = os.getenv("SECRET_KEY", "dev-secret"),
 
     # Session security & expiration configuration
     app.config.update(
