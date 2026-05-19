@@ -25,16 +25,20 @@ RUN set -eux; \
 
 FROM postgres:15.17-trixie
 
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=gosu-builder /out/gosu /usr/local/bin/gosu
+
 RUN set -eux; \
     chmod +x /usr/local/bin/gosu; \
     gosu --version; \
     gosu nobody true
 
-# Copy initialization scripts
 COPY init.sql /docker-entrypoint-initdb.d/
 
-# Optional: set default database configuration
 ENV POSTGRES_DB=docdb
 ENV POSTGRES_USER=postgres
 ENV POSTGRES_PASSWORD=postgres
